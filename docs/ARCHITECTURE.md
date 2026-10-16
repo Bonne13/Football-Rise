@@ -76,3 +76,13 @@ Criar interfaces como `ClubDataProvider`, `PlayerDataProvider` e `AssetResolver`
 
 ## Tecnologia inicial
 Começar com TypeScript para domínio/aplicação e uma interface Web leve. A escolha de renderer 3D será isolada da lógica da carreira para permitir evolução sem reescrever a simulação.
+
+## Adaptador web e publicação
+
+`src/application/career.ts` coordena o fluxo de carreira em comandos imutáveis. Avaliação/recrutamento, treino, contratos e elegibilidade de promoção ficam nos módulos de domínio; o cálculo posicional existente foi mantido. `src/data/clubs.ts` fornece um pacote fictício substituível via `ClubDataProvider`. A interface `src/ui/browser.ts` somente coleta decisões e apresenta o estado público, sem mostrar o POT interno.
+
+O codec `src/persistence/save.ts` valida o formato versionado 1, estrutura, limites, datas e referências. Seed e estado do RNG ficam no save. O adaptador web grava primeiro no localStorage e adota o novo estado somente após sucesso. Saves inválidos são preservados para exportação; não há reset silencioso nem transmissão do save ao servidor. Futuras versões devem adicionar migrações sequenciais.
+
+O build estático copia apenas módulos executáveis de navegador para `dist-web/`, sem testes, fontes ou dependências Node. O workflow `.github/workflows/pages.yml` instala pelo lockfile, verifica tipos/testes, gera e publica o artefato via GitHub Pages. O job de build tem somente leitura; o deploy recebe `pages: write` e `id-token: write`. A ativação inicial do Pages é uma configuração do repositório.
+
+Critérios do protótipo: aos 15 anos, promoção exige 6 atuações, 270 minutos e média recente ≥7,5; aos 16 ou mais, 4 atuações, 180 minutos e média ≥6,5. Também exige vaga e OVR compatível. Contratos de formação duram 104 semanas; salário reservado e bônus são debitados na assinatura. Transferências por acordo liberam vaga e salário reservado do clube anterior, sem devolver o bônus. Treinar/recuperar não avança o calendário; registrar uma atuação preparada avança uma semana. Mercado global, competição completa e partida controlável seguem nas fases futuras.
