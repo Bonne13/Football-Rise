@@ -70,7 +70,7 @@ const server = createServer(async (req, res) => {
     const simulated=await page.evaluate(async()=>{const u=document.querySelector('script[type=module]').src;const a=await import(u.replace('ui/browser.js','persistence/browser-storage.js'));const b=await import(u.replace('ui/browser.js','persistence/save.js'));const s=b.deserializeSave(await a.loadCareerText());return {played:s.world.fixtures.filter(f=>f.homeGoals!==null).length,own:s.world.stats.filter(p=>p.playerId===s.player.id).length}});
     assert.ok(simulated.played>0);assert.equal(simulated.own,0);
     await page.locator('#notice').waitFor({state:'hidden'});
-    await page.setViewportSize({width:390,height:844});await page.locator('#world-panel').evaluate(el=>el.scrollIntoView({block:'start'}));
+    await page.setViewportSize({width:390,height:844});await page.locator('#competition-detail').evaluate(el=>el.scrollIntoView({block:'start'}));
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
     await page.screenshot({path:join(screenshots,'43-leagues-mobile.png')});
     assert.deepEqual(errors,[]);console.log('Leagues passed: 526-club pack, divisional tables, confederation filters, CONCACAF/Sudamericana, unavailable-country notice, persisted world, autonomous week without player stats and mobile layout.');
