@@ -32,10 +32,6 @@ O jogador controla o próprio atleta nas partidas. **Football Rise não é apena
 **Nome:** Football Rise  
 **Slogan:** *From Rookie to Legend*
 
-## Projeto anterior
-
-O repositório `Game-teste` pode ser consultado apenas como referência para ideias e sistemas já experimentados. Football Rise é um projeto novo, com arquitetura própria, e não deve depender tecnicamente do projeto anterior.
-
 ## Estado
 
 Em desenvolvimento — fundação da engine de carreira e primeira vertical slice.
