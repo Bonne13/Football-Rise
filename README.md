@@ -1,41 +1,37 @@
-# Football Rise — estádios por clube, VAR e treinos
+# Football Rise — entorno dos estádios abertos
 
-**Capturas reais da versão em desenvolvimento. O jogo público ainda não foi atualizado.**
+**Capturas reais da versão em desenvolvimento, para revisão. O jogo público ainda não foi atualizado.**
 
-Os 238 clubes do catálogo têm um estádio de referência histórica associado. Há formatos retangulares, bowls e ovais, coberturas, fachadas, pistas, assentos e entornos diferentes. Clubes que dividem estádio mantêm o mesmo local, como Flamengo/Fluminense e Inter/Milan.
+O entorno ganhou quarteirões, casas e edifícios baixos com fachadas e telhados, ruas conectadas, calçadas, travessias, portões/bilheterias, estacionamento, carros com rodas e vidros, árvores, postes e bancos. O bairro acompanha também estádios em cenários de montanha e litoral; o mar fica distante, sem praia colada na arquibancada.
 
-São **recriações procedurais aproximadas**, sem modelos ou imagens oficiais. As capacidades são faixas visuais arredondadas. Reformas, nomes patrocinados e mandos temporários de 2026/27 ainda precisam de confirmação; estas imagens não representam uma reconstrução arquitetônica exata.
+O objetivo desta revisão é melhorar a paisagem vista de dentro dos estádios abertos. São cenários procedurais aproximados, sem reprodução geográfica exata das ruas reais.
 
-## Maracanã — Flamengo e Fluminense
+## São Januário — bairro e acessos
 
-![Maracanã: volume oval, cobertura e assentos em azul e amarelo](27-maracana.png)
+![São Januário com quarteirões, ruas, estacionamento e acessos](29-sao-januario.png)
 
-## Nilton Santos — Botafogo
+![Vista de campo em São Januário com o bairro ao fundo](30-field-sao-januario.png)
 
-![Nilton Santos: pista de atletismo e arquibancadas afastadas do campo](27-nilton-santos.png)
+## Vila Belmiro — entorno de um estádio menor
 
-## Anfield — Liverpool
+![Vila Belmiro e construções próximas](29-vila-belmiro.png)
 
-![Anfield: estádio retangular e arquibancadas próximas](27-anfield.png)
+![Paisagem vista durante o exercício na Vila Belmiro](30-field-vila-belmiro.png)
 
-## Santiago Bernabéu — Real Madrid
+## Dean Court — estádio pequeno e aberto
 
-![Bernabéu: fachada com faixas metálicas e cobertura](27-bernabeu.png)
+![Dean Court e seu entorno procedural](29-dean-court.png)
 
-## Allianz Arena — Bayern
+![Vista de campo em Dean Court](30-field-dean-court.png)
 
-![Allianz Arena: bowl coberto e assentos vermelhos](27-allianz-arena.png)
+## Ipurua — bairro e relevo distante
 
-## Vila Belmiro — Santos
+![Ipurua com bairro e montanhas](29-ipurua.png)
 
-![Vila Belmiro: estádio menor e arquibancadas próximas](27-vila-belmiro.png)
+![Entorno visível de dentro de Ipurua](30-field-ipurua.png)
 
-## San Siro — Inter e Milan
+## Maracanã — comparação em uma arena grande
 
-![San Siro: recriação aproximada do estádio compartilhado](27-san-siro.png)
+![Maracanã com acessos e bairro](29-maracana.png)
 
-## VAR de costas para a câmera, voltado às telas
-
-![Três profissionais sentados diante dos monitores](17-var-room.png)
-
-[Baixar as imagens](previas-estadios-treinos.zip) · [Ver os ajustes nos quatro treinamentos e no celular](previas-treinos.md) · [Mira sem alvo final](previas-mira-var.md) · [Uniformes da arbitragem](previas-arbitragem.md)
+[Baixar estas imagens](previas-entorno.zip) · [Prévia dos estádios por clube](previas-estadios.md) · [Treinos e VAR](previas-treinos.md) · [Mira sem alvo final](previas-mira-var.md)
