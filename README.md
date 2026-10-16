@@ -1,32 +1,41 @@
-# Footbal-Choyse
+# Football Rise
 
-Novo projeto de jogo de carreira no futebol, construído separadamente do projeto `Game-teste`.
+## From Rookie to Legend
+
+**Football Rise** é um jogo de carreira individual no futebol em que você começa como uma jovem promessa e constrói sua própria trajetória até tentar se tornar uma lenda.
+
+O projeto combina partidas jogáveis com um mundo de futebol persistente e dinâmico. O universo continua evoluindo independentemente do protagonista: clubes negociam, jogadores se transferem, evoluem, envelhecem e se aposentam, enquanto competições, rivalidades e histórias acontecem ao redor da carreira.
 
 ## Visão
 
-Footbal-Choyse será uma experiência de carreira individual em que o jogador começa na base, desenvolve seus fundamentos, conquista espaço no futebol profissional e constrói uma trajetória que pode atravessar clubes, ligas, seleções e diferentes fases da vida esportiva.
+A experiência acompanha toda a vida esportiva do atleta: base, primeiro contrato, disputa por minutos, evolução, transferências, seleção, auge, declínio e aposentadoria.
 
-O projeto combina gameplay partida a partida com um mundo de futebol persistente e dinâmico. O universo deve continuar evoluindo independentemente do protagonista: clubes negociam, jogadores se transferem, evoluem, envelhecem e se aposentam, enquanto competições e histórias acontecem ao redor da carreira.
+O jogador controla o próprio atleta nas partidas. **Football Rise não é apenas um simulador de menus ou de gestão**: jogar futebol é o núcleo da experiência.
 
 ## Pilares iniciais
 
 - Carreira começando na base e avançando até a aposentadoria.
 - Partidas jogáveis como núcleo da experiência.
-- Treinamentos, atributos, overall e potencial.
+- Treinamentos, atributos, OVR e potencial.
 - Recrutamento e conquista de espaço no elenco.
 - Mercado global de transferências entre clubes controlados pela IA.
 - Contratos, salários, agentes, empréstimos e negociações.
 - Notícias, rumores, entrevistas e jornalistas dentro de um universo simulado.
-- Lesões, saúde, forma, moral, confiança e relacionamento com treinador e elenco.
+- Lesões, saúde, forma, moral e confiança do treinador.
 - Aposentadoria baseada em múltiplos fatores, não somente idade.
 - Competições nacionais, continentais e seleções.
 - Mundo persistente com evolução de clubes e jogadores.
 - Saves independentes e carreiras de longa duração.
 
-## Referência do projeto anterior
+## Identidade
 
-O repositório `Game-teste` poderá ser consultado como referência para sistemas e ideias já desenvolvidos, mas este projeto terá arquitetura própria e será mantido separadamente para evitar conflitos entre as duas versões.
+**Nome:** Football Rise  
+**Slogan:** *From Rookie to Legend*
+
+## Projeto anterior
+
+O repositório `Game-teste` pode ser consultado apenas como referência para ideias e sistemas já experimentados. Football Rise é um projeto novo, com arquitetura própria, e não deve depender tecnicamente do projeto anterior.
 
 ## Estado
 
-Projeto em fase inicial de arquitetura e prototipagem.
+Em desenvolvimento — fundação da engine de carreira e primeira vertical slice.
