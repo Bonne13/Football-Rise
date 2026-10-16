@@ -1,35 +1,35 @@
-# Football Rise — bandeirinhas e VAR
+# Football Rise — uniformes da arbitragem e equipe VAR sentada
 
-**Prévias reais da versão em desenvolvimento. O jogo público ainda não foi atualizado.**
+**Novas capturas da versão em desenvolvimento, para aprovação. O jogo público ainda não foi atualizado.**
 
-A sequência acompanha um impedimento ocorrido na oportunidade jogável: sinal do bandeirinha, central de vídeo, deslocamento do árbitro ao monitor e comunicação da decisão. A sala tem três profissionais (VAR, AVAR e operador de replay), consoles, headsets e seis telas. Monitores e bandeirinha usam os mesmos dados congelados do lance.
+Árbitro e bandeirinhas usam roupas lisas, sem números, nomes, patrocínios ou inscrições. Três opções de camisa: preta, amarela e vermelha, com calção e meias pretos. A pausa permite escolher a cor ou seleção automática por contraste. São desenhos originais com a paleta solicitada. Os jogadores continuam numerados.
 
-Esta é uma apresentação cinematográfica simplificada, ligada às regras atuais de gol e impedimento. As telas mostram reconstruções esquemáticas dos dados, não seis gravações de câmeras. Revisões oficiais completas de faltas, pênaltis e vermelhos ainda não estão implementadas.
+Na central, os três profissionais aparecem sentados em cadeiras, com joelhos e braços dobrados. As roupas da equipe também são lisas. Telas e decisões do VAR continuam usando os dados congelados do lance.
 
-A revisão pode ser pausada, avançada ou fechada; o resultado é preservado e registrado uma única vez. Capturas abaixo geradas pelo aplicativo no Chromium, inclusive no tamanho de celular. Clique nas imagens para ampliar.
+Clique nas imagens para ampliar.
 
-## Bandeirinha sinalizando um impedimento real da oportunidade
+## Uniforme preto — sem numeração ou inscrições
 
-![Bandeirinha sinalizando um impedimento real da oportunidade](16-assistant-offside.png)
+![Uniforme preto — sem numeração ou inscrições](22-official-black.png)
 
-## Sala do VAR — três profissionais, headsets e seis telas
+## Uniforme amarelo — sem numeração ou inscrições
 
-![Sala do VAR — três profissionais, headsets e seis telas](17-var-room.png)
+![Uniforme amarelo — sem numeração ou inscrições](23-official-yellow.png)
 
-## Árbitro se deslocando até o monitor
+## Uniforme vermelho — sem numeração ou inscrições
 
-![Árbitro se deslocando até o monitor](18-referee-walking.png)
+![Uniforme vermelho — sem numeração ou inscrições](24-official-red.png)
 
-## Monitor exibindo os dados do mesmo lance
+## Bandeirinha com roupa lisa
 
-![Monitor exibindo os dados do mesmo lance](19-pitchside-monitor.png)
+![Bandeirinha com roupa lisa](16-assistant-offside.png)
 
-## Árbitro comunica a decisão
+## Três profissionais sentados — braços e joelhos dobrados, cadeiras visíveis
 
-![Árbitro comunica a decisão](20-var-verdict.png)
+![Três profissionais sentados — braços e joelhos dobrados, cadeiras visíveis](17-var-room.png)
 
-## Sala do VAR no navegador de celular
+## Equipe sentada na visualização de celular
 
-![Sala do VAR no navegador de celular](21-var-mobile.png)
+![Equipe sentada na visualização de celular](21-var-mobile.png)
 
-[Baixar as imagens do VAR](previas-var.zip) · [Ver as prévias anteriores dos jogadores e animações](previas-pixel-art.md)
+[Baixar as imagens](previas-arbitragem.zip) · [Sequência completa do VAR](previas-var.md) · [Jogadores e animações](previas-pixel-art.md)
