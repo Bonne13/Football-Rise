@@ -83,3 +83,24 @@ test('practice quality controls development and match goals come from actual goa
   for (const kind of match.sequence) { const t = createTrial(kind, 1, 42); t.resolved = true; t.score = 100; t.outcome = kind === 'shoot' || kind === 'freekick' ? 'goal' : 'complete'; match = recordTrial(match, t); }
   assert.deepEqual(matchPerformance(match, 30), { rating: 10, minutes: 30, goals: 2, assists: 0 });
 });
+
+
+test('gesture charge and player attributes determine strike speed independently of contact', async () => {
+  const { strikeVelocity } = await import('./trial.js');
+  const base = createCareer({ name: 'Força', nationality: 'Brasil', preferredFoot: 'right', position: 'ST', startingAge: 14, seed: 42 }).player.attributes;
+  const weak = { ...base, strength: 20, technique: 20, finishing: 20, passing: 20, setPieces: 20 };
+  const strong = { ...weak, strength: 80, technique: 80, finishing: 80, passing: 80, setPieces: 80 };
+  assert.equal(strikeVelocity(strong, 'shoot', 0), 0);
+  assert.equal(strikeVelocity(strong, 'shoot', .5), strikeVelocity(strong, 'shoot', 1) / 2);
+  assert.ok(strikeVelocity(strong, 'shoot', 1) > strikeVelocity(weak, 'shoot', 1));
+  assert.ok(strikeVelocity({ ...weak, passing: 90 }, 'pass', 1) > strikeVelocity(weak, 'pass', 1));
+  assert.ok(strikeVelocity({ ...weak, setPieces: 90 }, 'freekick', 1) > strikeVelocity(weak, 'freekick', 1));
+  const trial = createTrial('shoot', 1, 42), other = createTrial('shoot', 1, 42);
+  controlTrial(trial, { type: 'kick', aim: trial.target, curve: 0, lift: 0, velocity: strikeVelocity(weak, 'shoot', .5) });
+  controlTrial(other, { type: 'kick', aim: other.target, curve: 1, lift: 1, velocity: strikeVelocity(weak, 'shoot', .5) });
+  assert.equal(trial.shot!.duration, other.shot!.duration);
+  const fast = createTrial('shoot', 1, 42);
+  controlTrial(fast, { type: 'kick', aim: fast.target, curve: 0, lift: 0, velocity: strikeVelocity(strong, 'shoot', 1) });
+  assert.ok(fast.shot!.duration < trial.shot!.duration);
+  assert.throws(() => strikeVelocity(strong, 'shoot', NaN));
+});

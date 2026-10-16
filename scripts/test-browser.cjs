@@ -17,6 +17,12 @@ await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:x+18
 assert.equal(await p.locator('.field-stage').getAttribute('data-phase'),'preparing');assert.equal(await p.locator('#aim-reticle').isVisible(),true);
 await p.screenshot({path:join(screenshots,'prepare.png'),fullPage:true});
 await cdp.send('Input.dispatchTouchEvent',{type:'touchCancel',touchPoints:[]});await p.clock.runFor(1000);assert.equal(await p.locator('#field-next').isVisible(),false);
+// Contact dragging changes effects only, never force or firing.
+const ball=await p.locator('#contact-ball').boundingBox();const before=await p.locator('#shot-power-value').innerText();
+await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:ball.x+ball.width/2,y:ball.y+ball.height/2}]});
+await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:ball.x+ball.width/2+12,y:ball.y+ball.height/2+70}]});
+await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await p.clock.runFor(1000);
+assert.equal(await p.locator('#shot-power-value').innerText(),before);assert.equal(await p.locator('#field-next').isVisible(),false);assert.equal(await p.locator('.field-stage').getAttribute('data-phase'),'preparing');
 // Pause freezes presentation and exposes real sound preferences.
 await p.locator('#field-pause').click();assert.equal(await p.locator('#pause-menu').isVisible(),true);
 await p.locator('#field-sound').click();assert.equal(await p.locator('#field-sound').innerText(),'Som: desligado');

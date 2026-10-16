@@ -124,3 +124,8 @@ A interface também aceita puxar para trás no campo: após uma zona morta de 12
 Treinos e oportunidades de partida ocupam o viewport, respeitando as áreas seguras do celular. A pausa oferece retomada, som e saída; fica disponível entre ações e durante condução/corrida, e o navegador também pausa ao perder foco ou ocultar a aba. Pausa congela o relógio de domínio e de apresentação, cancela gestos e suspende áudio. Ao sair, uma tentativa resolvida é gravada uma única vez antes da navegação; tentativas incompletas recomeçam. Falha de gravação mantém o menu aberto. A preferência de som usa chave separada, sem alterar o save v1. Os efeitos sonoros são sintetizados localmente por Web Audio após interação.
 
 A animação 3D deriva deslocamento dos atletas para passada, direção, braços e oscilação do corpo; inclui preparação, aproximação e acompanhamento do chute e alcance do goleiro. Esse estado visual não decide gols, colisões ou notas. Não representa ainda uma partida completa com 22 atletas.
+
+
+## Força pela mira e atributos
+
+A seleção do ponto de contato não carrega potência nem executa chute: seus gestos ajustam somente curva e elevação. A puxada da mira no campo fornece a carga, mostrada em percentual e velocidade estimada. `strikeVelocity` no domínio combina força, técnica e a habilidade do fundamento (finalização, passe ou bola parada) para calcular o teto; a carga multiplica esse teto. O chute recebe a velocidade calculada, que determina seu tempo de voo pela distância. É uma calibração de protótipo, sem simulação aerodinâmica. No teclado, espaço executa com carga máxima. Saves e resultados confirmados continuam no formato existente.

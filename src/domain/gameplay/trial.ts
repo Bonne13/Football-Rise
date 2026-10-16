@@ -1,3 +1,4 @@
+import type { Attributes } from '../player/player.js';
 import { bounded, draw, requireRule } from '../../core/rules.js';
 export const DRILLS = ['shoot', 'vision', 'pass', 'speed', 'technique', 'freekick'] as const;
 export type Drill = typeof DRILLS[number];
@@ -11,7 +12,7 @@ export interface Trial {
   lane: number; distance: number; obstacles: { distance: number; lane: number; passed: boolean }[];
   mates: Point[]; defenders: Point[]; offsideLine: number; accuracy: number;
 }
-export type TrialInput = { type: 'kick'; aim: Point; curve: number; lift: number } | { type: 'move'; destination: Point } | { type: 'lane'; direction: -1 | 1 };
+export type TrialInput = { type: 'kick'; aim: Point; curve: number; lift: number; velocity?: number } | { type: 'move'; destination: Point } | { type: 'lane'; direction: -1 | 1 };
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
 const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
 export function keeperAt(time: number) { return 440 + Math.sin(time * 1.8) * 135; }
@@ -42,6 +43,14 @@ export function createTrial(kind: Drill, attempt: number, seed: number, accuracy
 function finish(t: Trial, score: number, message: string, outcome: Trial['outcome']) {
   t.resolved = true; t.score = Math.round(clamp(score, 0, 100)); t.message = message; t.outcome = outcome;
 }
+/** Prototype calibration: attributes set the ceiling, gesture selects a fraction of it. */
+export function strikeVelocity(attributes: Attributes, kind: Drill, charge: number): number {
+  bounded(charge, 0, 1);
+  const skill = kind === 'pass' || kind === 'vision' ? attributes.passing : kind === 'freekick' ? attributes.setPieces : attributes.finishing;
+  bounded(attributes.strength, 0, 100); bounded(attributes.technique, 0, 100); bounded(skill, 0, 100);
+  const ceiling = 55 + attributes.strength * .45 + attributes.technique * .15 + skill * .25;
+  return ceiling * charge;
+}
 /** Input mutates only a private copy owned by the running field adapter. */
 export function controlTrial(t: Trial, input: TrialInput) {
   if (t.resolved || t.shot) return;
@@ -49,9 +58,10 @@ export function controlTrial(t: Trial, input: TrialInput) {
   if (input.type === 'move') { if (t.kind !== 'technique') return; bounded(input.destination.x, 0, 880); bounded(input.destination.y, 0, 1320); t.started = true; t.destination = { ...input.destination }; return; }
   if (!['shoot', 'freekick', 'pass', 'vision'].includes(t.kind)) return;
   bounded(input.aim.x, -1500, 2500); bounded(input.aim.y, -1500, 2500); bounded(input.curve, -1, 1); bounded(input.lift, 0, 1);
+  if (input.velocity !== undefined) bounded(input.velocity, 1, 150);
   t.started = true; t.aim = { ...input.aim };
   const receiver = t.kind === 'vision' ? [...t.mates].sort((a, b) => distance(a, input.aim) - distance(b, input.aim))[0]! : null;
-  t.shot = { from: { ...t.origin }, end: { ...input.aim }, elapsed: 0, duration: t.kind === 'pass' || t.kind === 'vision' ? .85 : .8,
+  t.shot = { from: { ...t.origin }, end: { ...input.aim }, elapsed: 0, duration: input.velocity === undefined ? (t.kind === 'pass' || t.kind === 'vision' ? .85 : .8) : Math.max(.3, Math.hypot(input.aim.x - t.origin.x, input.aim.y - t.origin.y) / 50 / (input.velocity / 3.6)),
     curve: input.curve, lift: input.lift, receiver, offside: !!receiver && isOffside(receiver, t.origin, [{ x: 440, y: 75 }, ...t.defenders]), keeper: keeperAt(t.time) };
 }
 export function tickTrial(t: Trial, seconds: number) {

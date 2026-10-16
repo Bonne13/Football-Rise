@@ -43,7 +43,7 @@ function render() {
     try { const raw = localStorage.getItem(key); if (raw) session = restoreSession(raw, expected); }
     catch { message('A sessão de campo não pôde ser retomada. Sua carreira foi preservada.', true); }
     app.innerHTML = '<div id="field-host"></div>';
-    disposeField = mountField(app.querySelector<HTMLElement>('#field-host')!, { session,
+    disposeField = mountField(app.querySelector<HTMLElement>('#field-host')!, { session, attributes: career.player.attributes,
       onProgress: next => localStorage.setItem(key, JSON.stringify(next)),
       onComplete: completed => {
         const command: Command = selection.mode === 'assessment' ? { type: 'assess', performances: assessmentScores(completed) }
