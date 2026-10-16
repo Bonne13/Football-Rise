@@ -1,6 +1,9 @@
+import { mountField } from './field.js';
+import { createSession, restoreSession, assessmentScores, matchPerformance, sessionAverage, type DrillSession } from '../application/drills.js';
+import type { Drill } from '../domain/gameplay/trial.js';
 import { createCareer, advanceCareer, careerView, type Command } from '../application/career.js';
-import { ATTRIBUTES, POSITIONS, type CareerState } from '../domain/career/state.js';
-import type { Attributes, Position } from '../domain/player/player.js';
+import { POSITIONS, type CareerState } from '../domain/career/state.js';
+import type { Position } from '../domain/player/player.js';
 import { FOCUSES, type Focus } from '../domain/training/training.js';
 import { deserializeSave, serializeSave } from '../persistence/save.js';
 const KEY = 'football-rise.career.v1';
@@ -18,20 +21,51 @@ function button(text: string, action: string, primary = false) { return `<button
 function tools() { return `<div class="tools">${state || blocked ? button('Baixar save', 'export') : ''}<label class="file">Importar save<input id="import" type="file" accept=".json,application/json" aria-label="Importar save"></label>${state ? button('Nova carreira', 'new') : ''}</div><p class="hint">Seu progresso fica neste navegador. Baixe uma cópia para guardar ou continuar em outro aparelho.</p>`; }
 function creation() { return `<section class="hero"><span class="badge">SUA JORNADA COMEÇA NA BASE</span><h1>Todo ídolo teve<br>um <em>primeiro dia.</em></h1><p>Comece aos 14 anos. Encontre seu lugar em campo, conquiste um contrato e escreva sua própria história.</p></section><div class="grid"><section class="card"><h2>Quem vai entrar em campo?</h2><p class="muted">O primeiro nome da sua história é o seu.</p><form id="create"><div class="fields">${field('Nome do jogador', 'name', '', 'required maxlength="100" placeholder="Como você se chama?"')}${field('Nacionalidade', 'nationality', 'Brasil', 'required maxlength="100"')}<label>Idade inicial<select name="age"><option>14</option><option>15</option><option>16</option></select></label><label>Pé preferido<select name="foot"><option value="right">Direito</option><option value="left">Esquerdo</option><option value="both">Ambos</option></select></label><label class="wide">Sua posição<select name="position">${POSITIONS.map(p => `<option value="${p}" ${p === 'CM' ? 'selected' : ''}>${names[p]} · ${p}</option>`).join('')}</select></label></div><button class="primary full" ${blocked ? 'disabled' : ''}>Começar minha história →</button></form><p class="hint">Clubes fictícios. Contratos em unidades de carreira (UC).</p>${tools()}</section><aside class="card"><h2>Conquiste cada etapa.</h2><ol class="steps"><li>Avalie seus fundamentos</li><li>Treine sua especialidade</li><li>Entre no radar dos clubes</li><li>Escolha seu primeiro contrato</li><li>Prepare-se para a estreia</li></ol></aside></div>`; }
 function stage(s: CareerState): string {
-  if (s.stage === 'created') return `<h2>Avaliação de fundamentos</h2><p class="muted">Registre as notas do teste inicial, entre 0 e 100. Avaliação manual neste protótipo.</p><form id="assess"><div class="fields">${ATTRIBUTES.map(k => field(names[k]!, k, '50', 'type="number" inputmode="numeric" min="0" max="100" required')).join('')}</div><button class="primary full">Concluir avaliação</button></form>`;
+  if (s.stage === 'created') return `<h2>Avaliação jogável da base</h2><p class="muted">Entre em campo: finalização, visão, passe, velocidade, condução e falta. São três tentativas por fundamento. Suas jogadas determinam as notas.</p>${button('Começar avaliação no campo →', 'assessment', true)}`;
   if (s.stage === 'offers') return `<h2>O futuro está nas suas mãos.</h2><p class="muted">Compare as condições e escolha seu próximo clube.</p>${careerView(s).offers.map(o => `<article class="offer"><span class="badge">${o.team === 'youth' ? 'Base' : 'Principal'}</span><h3>${esc(o.clubName)}</h3><p><strong>${o.weeklyWage} UC</strong> / semana · bônus ${o.signingBonus} UC</p><p class="muted">${o.durationWeeks} semanas · ${o.role === 'reserve' ? 'Reserva' : 'Promessa'}</p><button class="primary" data-accept="${esc(o.id)}">Escolher este clube</button></article>`).join('')}${s.contract ? `<div class="actions">${button('Continuar no clube atual', 'prepare')}</div>` : ''}`;
-  if (s.stage === 'ready' && s.preparation) { const p = s.preparation; return `<span class="badge">PRÓXIMA PARTIDA</span><h2>${esc(p.competition)}</h2><p>${date(p.date)} · ${esc(p.opponent)}</p><p><strong>${p.expectedMinutes} minutos</strong> previstos</p><p>${esc(p.objective)}</p><p class="muted">A partida controlável chega na Fase 2. Você já pode testar a jornada até a estreia.</p><details><summary>Registrar uma atuação manual para testar a progressão</summary><form id="performance"><div class="fields">${field('Nota (0–10)', 'rating', '7', 'type="number" min="0" max="10" step="0.1" required')}${field('Minutos', 'minutes', '30', 'type="number" min="1" max="90" required')}${field('Gols', 'goals', '0', 'type="number" min="0" max="30" required')}${field('Assistências', 'assists', '0', 'type="number" min="0" max="30" required')}</div><button class="primary full">Registrar atuação</button></form></details>`; }
-  return `<h2>Faça cada dia valer.</h2><p class="muted">Escolha um fundamento. Recupere sua energia entre sessões.</p><form id="train"><div class="fields"><label class="wide">Foco do treino<select name="focus">${FOCUSES.map(f => `<option value="${f}">${names[f]}</option>`).join('')}</select></label></div><button class="primary full">Treinar agora</button></form><div class="actions">${button('Recuperar energia', 'recover')}${s.stage !== 'assessed' ? button('Buscar propostas', 'scout') : ''}</div>${s.contract ? `<div class="actions">${button('Preparar próxima partida →', 'prepare', true)}${s.contract.team === 'youth' ? button('Solicitar promoção', 'promote') : ''}</div>` : ''}`;
+  if (s.stage === 'ready' && s.preparation) { const p = s.preparation; return `<span class="badge">PRÓXIMA PARTIDA</span><h2>${esc(p.competition)}</h2><p>${date(p.date)} · ${esc(p.opponent)}</p><p><strong>${p.expectedMinutes} minutos</strong> previstos</p><p>${esc(p.objective)}</p><p class="muted">Controle suas oportunidades: passe, finalização, condução e falta. Seus acertos definem gols e nota da atuação.</p>${button('Entrar em campo →', 'match', true)}`; }
+  return `<h2>Faça cada dia valer.</h2><p class="muted">Escolha um fundamento. Recupere sua energia entre sessões.</p><form id="train"><div class="fields"><label class="wide">Foco do treino<select name="focus">${FOCUSES.map(f => `<option value="${f}">${names[f]}</option>`).join('')}</select></label></div><button class="primary full">Praticar no campo →</button></form><div class="actions">${button('Recuperar energia', 'recover')}${s.stage !== 'assessed' ? button('Buscar propostas', 'scout') : ''}</div>${s.contract ? `<div class="actions">${button('Preparar próxima partida →', 'prepare', true)}${s.contract.team === 'youth' ? button('Solicitar promoção', 'promote') : ''}</div>` : ''}`;
 }
 function dashboard(s: CareerState) { const v = careerView(s); return `<section class="hero"><span class="badge">${esc(v.club ?? 'AVALIAÇÃO NA BASE')} · ${s.contract?.team === 'senior' ? 'PRINCIPAL' : 'BASE'}</span><h1>${esc(v.name)}<br><em>${titles[s.stage]}.</em></h1><p>${names[v.position]} · ${v.age} anos · ${date(v.date)}</p></section><div class="stats">${[['Overall', v.overall], ['Potencial estimado', v.potentialEstimate ? `${v.potentialEstimate.low}–${v.potentialEstimate.high}` : '—'], ['Energia', v.energy], ['Atuações', v.development.appearances]].map(([label, value]) => `<div class="stat"><small>${label}</small><strong>${value}</strong></div>`).join('')}</div><div class="grid"><section class="card">${stage(s)}</section><aside><section class="card"><h2>${esc(v.club ?? 'Em busca de uma chance')}</h2><p class="muted">${s.contract ? `${s.contract.team === 'youth' ? 'Base' : 'Principal'} · ${s.contract.role === 'reserve' ? 'Reserva' : 'Promessa'}<br>${s.contract.weeklyWage} UC / semana<br>Contrato até ${date(s.contract.endDate)}` : 'Conclua sua avaliação e o primeiro treino para chamar a atenção dos clubes.'}</p><p class="hint">Promoção aos 15: 6 atuações, 270 minutos e média recente 7,5. Aos 16: 4 atuações, 180 minutos e média 6,5. OVR e vagas também contam.</p></section><section class="card"><h3>Diário da carreira</h3><ol class="history">${s.history.slice(-6).map(e => `<li>${esc(e)}</li>`).join('')}</ol></section>${s.reports.length ? `<section class="card"><h3>No radar</h3>${s.reports.map(r => `<p class="hint"><b>${esc(s.clubs.find(c => c.id === r.clubId)?.name)} · ${r.team === 'youth' ? 'base' : 'principal'}</b><br>${esc(r.reason)}</p>`).join('')}</section>` : ''}</aside></div>${tools()}`; }
-function render() { app.innerHTML = (blocked ? '<section class="card"><h2>Seu save foi preservado</h2><p>Não foi possível carregar a carreira. Baixe o save antes de importar outro.</p></section>' : '') + (state ? dashboard(state) : creation()); }
+let playing: { mode: DrillSession['mode']; focus: Focus | null } | null = null;
+let disposeField: (() => void) | undefined;
+const drillForFocus: Record<Focus, Drill> = { finishing: 'shoot', passing: 'pass', defending: 'vision', goalkeeping: 'vision', pace: 'speed', technique: 'technique', vision: 'vision', setPieces: 'freekick' };
+function startField(mode: DrillSession['mode'], focus: Focus | null = null) {
+  playing = { mode, focus }; render(); app.scrollIntoView({ block: 'start' });
+}
+function render() {
+  disposeField?.(); disposeField = undefined;
+  if (playing && state) {
+    const career = state; const selection = playing;
+    const key = `football-rise.field.v1:${career.player.id}:${career.date}:${career.trainingSessions}:${selection.mode}:${selection.focus ?? ''}`;
+    const expected = createSession(selection.mode, career.rng, selection.focus ? drillForFocus[selection.focus] : 'shoot');
+    let session = expected;
+    try { const raw = localStorage.getItem(key); if (raw) session = restoreSession(raw, expected); }
+    catch { message('A sessão de campo não pôde ser retomada. Sua carreira foi preservada.', true); }
+    app.innerHTML = '<div id="field-host"></div>';
+    disposeField = mountField(app.querySelector<HTMLElement>('#field-host')!, { session,
+      onProgress: next => localStorage.setItem(key, JSON.stringify(next)),
+      onComplete: completed => {
+        const command: Command = selection.mode === 'assessment' ? { type: 'assess', performances: assessmentScores(completed) }
+          : selection.mode === 'practice' ? { type: 'practice', focus: selection.focus!, quality: sessionAverage(completed) }
+          : { type: 'performance', performance: matchPerformance(completed, career.preparation!.expectedMinutes) };
+        const next = advanceCareer(career, command);
+        localStorage.setItem(KEY, serializeSave(next));
+        state = next; playing = null;
+        try { localStorage.removeItem(key); } catch { /* career already saved */ }
+        render(); message('Resultado aplicado à carreira e salvo.');
+      },
+      onExit: () => { playing = null; render(); },
+    }); return;
+  }
+  app.innerHTML = (blocked ? '<section class="card"><h2>Seu save foi preservado</h2><p>Não foi possível carregar a carreira. Baixe o save antes de importar outro.</p></section>' : '') + (state ? dashboard(state) : creation());
+}
+
 app.addEventListener('submit', e => {
   e.preventDefault(); const form = e.target as HTMLFormElement; const d = new FormData(form);
   try {
-    if (form.id === 'create') commit(createCareer({ name: String(d.get('name')), nationality: String(d.get('nationality')), position: d.get('position') as Position, preferredFoot: d.get('foot') as 'right' | 'left' | 'both', startingAge: Number(d.get('age')) as 14 | 15 | 16, seed: crypto.getRandomValues(new Uint32Array(1))[0]! }));
-    else if (form.id === 'assess') dispatch({ type: 'assess', performances: Object.fromEntries(ATTRIBUTES.map(k => [k, Number(d.get(k))])) as Attributes });
-    else if (form.id === 'train') dispatch({ type: 'train', focus: d.get('focus') as Focus });
-    else if (form.id === 'performance') dispatch({ type: 'performance', performance: { rating: Number(d.get('rating')), minutes: Number(d.get('minutes')), goals: Number(d.get('goals')), assists: Number(d.get('assists')) } });
+    if (form.id === 'create') { commit(createCareer({ name: String(d.get('name')), nationality: String(d.get('nationality')), position: d.get('position') as Position, preferredFoot: d.get('foot') as 'right' | 'left' | 'both', startingAge: Number(d.get('age')) as 14 | 15 | 16, seed: crypto.getRandomValues(new Uint32Array(1))[0]! })); startField('assessment'); }
+    else if (form.id === 'train') { if (!state || state.player.energy < 20 || state.player.health < 60) throw new Error('Recupere energia e saúde antes de treinar.'); startField('practice', d.get('focus') as Focus); }
   } catch (err) { message(err instanceof Error ? err.message : 'Não foi possível salvar.', true); }
 });
 app.addEventListener('click', e => {
@@ -39,6 +73,7 @@ app.addEventListener('click', e => {
   try {
     if (b.dataset.accept) { if (confirm('Assinar com este clube e encerrar as outras propostas?')) dispatch({ type: 'accept', offerId: b.dataset.accept }); return; }
     const action = b.dataset.action;
+    if (action === 'assessment' || action === 'match') { startField(action); return; }
     if (action === 'export') { const raw = localStorage.getItem(KEY); if (raw) { const url = URL.createObjectURL(new Blob([raw], { type: 'application/json' })); const a = document.createElement('a'); a.href = url; a.download = 'football-rise-save.json'; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 10000); } }
     else if (action === 'new') { if (confirm('Baixou uma cópia? A nova carreira substituirá seu save.')) { localStorage.removeItem(KEY); state = null; render(); } }
     else if (action === 'recover' || action === 'scout' || action === 'prepare' || action === 'promote') dispatch({ type: action });

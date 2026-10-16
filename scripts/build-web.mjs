@@ -1,4 +1,5 @@
-import { cp, mkdir, readdir, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdir, readdir, rm, writeFile, readFile, rename } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 const root = fileURLToPath(new URL('../', import.meta.url)); const target = join(root, 'dist-web');
@@ -10,5 +11,20 @@ async function copy(directory) {
   }
 }
 for (const d of ['application', 'core', 'data', 'domain']) await copy(d);
-for (const path of ['ui/browser.js', 'persistence/save.js']) { const dest = join(target, 'modules', path); await mkdir(dirname(dest), { recursive: true }); await cp(join(root, 'dist', path), dest); }
+for (const path of ['ui/browser.js', 'ui/field.js', 'persistence/save.js']) { const dest = join(target, 'modules', path); await mkdir(dirname(dest), { recursive: true }); await cp(join(root, 'dist', path), dest); }
+// A new module directory invalidates the entire import graph on mobile browsers.
+const hash = createHash('sha256');
+async function fingerprint(directory) {
+  for (const entry of (await readdir(directory, { withFileTypes: true })).sort((a, b) => a.name.localeCompare(b.name))) {
+    const path = join(directory, entry.name);
+    hash.update(entry.name);
+    if (entry.isDirectory()) await fingerprint(path); else hash.update(await readFile(path));
+  }
+}
+await fingerprint(join(target, 'modules'));
+hash.update(await readFile(join(target, 'style.css')));
+const version = hash.digest('hex').slice(0, 12);
+await rename(join(target, 'modules'), join(target, `modules-${version}`));
+const html = await readFile(join(target, 'index.html'), 'utf8');
+await writeFile(join(target, 'index.html'), html.replace('./modules/', `./modules-${version}/`).replace('./style.css', `./style.css?v=${version}`));
 await writeFile(join(target, '.nojekyll'), ''); console.log('Site gerado em dist-web/.');

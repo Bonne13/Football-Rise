@@ -7,7 +7,7 @@ import { train, type Focus } from '../domain/training/training.js';
 import { sign } from '../domain/transfers/contracts.js';
 import { eligible, record } from '../domain/career/progression.js';
 export interface NewCareer { name: string; nationality: string; position: Position; preferredFoot: 'left' | 'right' | 'both'; seed: number; startingAge?: 14 | 15 | 16 }
-export type Command = { type: 'assess'; performances: Attributes } | { type: 'train'; focus: Focus } | { type: 'accept'; offerId: string }
+export type Command = { type: 'practice'; focus: Focus; quality: number } | { type: 'assess'; performances: Attributes } | { type: 'train'; focus: Focus } | { type: 'accept'; offerId: string }
   | { type: 'performance'; performance: Performance } | { type: 'recover' | 'scout' | 'prepare' | 'promote' };
 export function createCareer(input: NewCareer, provider: ClubDataProvider = developmentClubs): CareerState {
   for (const value of [input.name, input.nationality]) requireRule(typeof value === 'string' && value.trim().length > 0 && value.length <= 100, 'Nome/nacionalidade inválidos.');
@@ -30,9 +30,10 @@ export function advanceCareer(previous: CareerState, command: Command): CareerSt
   const s = structuredClone(previous);
   switch (command.type) {
     case 'assess': { allowed(s, ['created']); const r = assess(s.player, command.performances, s.rng); Object.assign(s, r); s.stage = 'assessed'; s.history.push('Avaliação de fundamentos concluída.'); break; }
+    case 'practice':
     case 'train': {
       allowed(s, ['assessed', 'trained', 'contracted', 'active']); const c = s.clubs.find(c => c.id === s.contract?.clubId);
-      s.player = train(s.player, command.focus, c?.facilities ?? 40, c?.coach ?? 50, s.discipline); s.trainingSessions++;
+      s.player = train(s.player, command.focus, c?.facilities ?? 40, c?.coach ?? 50, s.discipline, command.type === 'practice' ? command.quality : 100); s.trainingSessions++;
       if (!s.contract) s.stage = 'trained'; s.history.push(`Treino: ${command.focus}.`); break;
     }
     case 'recover': allowed(s, ['assessed', 'trained', 'offers', 'contracted', 'active']); s.player.energy = Math.min(100, s.player.energy + 30); s.history.push('Sessão de recuperação.'); break;

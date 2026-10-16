@@ -1,0 +1,85 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { createTrial, controlTrial, tickTrial, keeperAt, teammateAt, isOffside, type Drill, type Trial } from './trial.js';
+import { assessmentScores, createSession, recordTrial, restoreSession, matchPerformance } from '../../application/drills.js';
+import { createCareer, advanceCareer } from '../../application/career.js';
+function advance(t: Trial, seconds: number) { for (let i = 0; i < Math.ceil(seconds * 20); i++) tickTrial(t, .05); }
+function kick(kind: Drill, aim: { x: number; y: number }, curve = 0, lift = 0) {
+  const t = createTrial(kind, 1, 42); controlTrial(t, { type: 'kick', aim, curve, lift }); advance(t, 1); return t;
+}
+test('shots score goals, keeper saves central attempts, wide shots fail and resolved trials cannot change', () => {
+  assert.equal(kick('shoot', { x: 300, y: 60 }).outcome, 'goal');
+  assert.equal(kick('shoot', { x: keeperAt(0), y: 60 }).outcome, 'save');
+  assert.equal(kick('shoot', { x: 700, y: 60 }).outcome, 'wide');
+  const t = kick('shoot', { x: 300, y: 60 }); const before = structuredClone(t);
+  controlTrial(t, { type: 'kick', aim: { x: 440, y: 60 }, curve: 0, lift: 0 }); advance(t, 1); assert.deepEqual(t, before);
+});
+test('free kicks hit a wall unless lift or curve clears it', () => {
+  assert.equal(kick('freekick', { x: 440, y: 60 }).outcome, 'wall');
+  assert.equal(kick('freekick', { x: 440, y: 60 }, 0, .8).outcome, 'goal');
+  assert.equal(kick('freekick', { x: 440, y: 60 }, -1).outcome, 'goal');
+});
+test('passing anticipates teammate arrival and defenders intercept blocked paths', () => {
+  const precise = kick('pass', teammateAt(.85)); assert.equal(precise.outcome, 'received'); assert.ok(precise.score > 95);
+  assert.equal(kick('pass', { x: 400, y: 200 }).outcome, 'intercepted');
+});
+test('vision rejects offside but permits a free teammate behind the defensive line', () => {
+  assert.equal(kick('vision', { x: 150, y: 310 }).outcome, 'received');
+  assert.equal(kick('vision', { x: 330, y: 120 }).outcome, 'offside');
+  assert.equal(isOffside({ x: 200, y: 250 }, { x: 440, y: 950 }, [{ x: 440, y: 75 }, { x: 440, y: 250 }]), false);
+});
+test('sprint responds to lanes and collision avoidance improves the result', () => {
+  const good = createTrial('speed', 1, 42); controlTrial(good, { type: 'lane', direction: -1 });
+  while (!good.resolved) {
+    const upcoming = good.obstacles.find(o => !o.passed);
+    if (upcoming && upcoming.distance - good.distance < 5 && upcoming.lane === good.lane) controlTrial(good, { type: 'lane', direction: good.lane === 0 ? 1 : -1 });
+    tickTrial(good, .05);
+  }
+  const bad = createTrial('speed', 1, 42); bad.started = true; advance(bad, 8);
+  assert.equal(good.outcome, 'complete'); assert.equal(good.score, 100); assert.ok(good.score > bad.score);
+});
+test('dribbling moves to destinations, requires ordered gates and penalizes cones', () => {
+  const t = createTrial('technique', 1, 42);
+  controlTrial(t, { type: 'move', destination: t.gates[4]! }); tickTrial(t, .1); assert.equal(t.gate, 0);
+  for (const gate of t.gates) { controlTrial(t, { type: 'move', destination: gate }); for (let i = 0; i < 200 && !t.resolved && Math.hypot(t.player.x - gate.x, t.player.y - gate.y) > 3; i++) tickTrial(t, .05); }
+  assert.equal(t.outcome, 'complete'); assert.equal(t.gate, 5); assert.ok(t.score > 0);
+  const collision = createTrial('technique', 1, 42); controlTrial(collision, { type: 'move', destination: collision.cones[0]! }); advance(collision, 2); assert.ok(collision.collisions > 0);
+});
+test('waiting does not consume time, active trials time out and seeds reproduce targets', () => {
+  for (const kind of ['shoot', 'vision', 'pass', 'speed', 'technique', 'freekick'] as const) {
+    const t = createTrial(kind, 1, 42); advance(t, 25); assert.equal(t.time, 0); assert.equal(t.resolved, false);
+    assert.deepEqual(t, createTrial(kind, 1, 42));
+    t.started = true; advance(t, 25); assert.equal(t.resolved, true);
+  }
+});
+test('invalid gameplay inputs fail and tick substeps preserve frame-rate outcomes', () => {
+  const t = createTrial('shoot', 1, 42);
+  assert.throws(() => controlTrial(t, { type: 'kick', aim: { x: NaN, y: 60 }, curve: 0, lift: 0 }));
+  assert.throws(() => tickTrial(t, -1));
+  const a = createTrial('speed', 1, 42), b = structuredClone(a); a.started = b.started = true;
+  for (let i = 0; i < 40; i++) tickTrial(a, .2); for (let i = 0; i < 400; i++) tickTrial(b, .02);
+  assert.equal(a.outcome, b.outcome); assert.equal(a.score, b.score);
+});
+test('18 played trials produce assessment attributes and can resume between attempts', () => {
+  let session = createSession('assessment', 42);
+  assert.equal(session.sequence.length, 18); assert.throws(() => assessmentScores(session));
+  for (const kind of session.sequence) {
+    const t = createTrial(kind, session.results.length + 1, 42); t.resolved = true; t.score = 80; t.outcome = 'complete';
+    session = recordTrial(session, t); session = restoreSession(JSON.stringify(session), createSession('assessment', 42));
+  }
+  assert.equal(assessmentScores(session).finishing, 80); assert.equal(assessmentScores(session).setPieces, 80);
+  assert.throws(() => recordTrial(session, kick('shoot', { x: 300, y: 60 })));
+  assert.throws(() => restoreSession(JSON.stringify({ ...session, seed: 43 }), createSession('assessment', 42)));
+});
+test('practice quality controls development and match goals come from actual goal outcomes', () => {
+  let s = createCareer({ name: 'Alex', nationality: 'Brasil', position: 'ST', preferredFoot: 'right', seed: 42 });
+  const scores = { finishing: 50, passing: 50, vision: 50, technique: 50, pace: 50, strength: 50, defending: 50, goalkeeping: 50, setPieces: 50, composure: 50 };
+  s = advanceCareer(s, { type: 'assess', performances: scores });
+  const failed = advanceCareer(s, { type: 'practice', focus: 'finishing', quality: 0 });
+  assert.deepEqual(failed.player.attributes, s.player.attributes); assert.equal(failed.player.energy, s.player.energy - 15);
+  assert.ok(advanceCareer(s, { type: 'practice', focus: 'finishing', quality: 100 }).player.attributes.finishing > s.player.attributes.finishing);
+  assert.throws(() => advanceCareer(s, { type: 'practice', focus: 'finishing', quality: 101 }));
+  let match = createSession('match', 42);
+  for (const kind of match.sequence) { const t = createTrial(kind, 1, 42); t.resolved = true; t.score = 100; t.outcome = kind === 'shoot' || kind === 'freekick' ? 'goal' : 'complete'; match = recordTrial(match, t); }
+  assert.deepEqual(matchPerformance(match, 30), { rating: 10, minutes: 30, goals: 2, assists: 0 });
+});
