@@ -1,0 +1,24 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { createCareer, advanceCareer } from '../../application/career.js';
+import { careerAchievements } from './achievements.js';
+import { ATTRIBUTES } from '../career/state.js';
+import type { Attributes } from '../player/player.js';
+test('achievements use career facts, not a club title belonging to another player', () => {
+  let s = createCareer({ name: 'Alex', nationality: 'Brasil', position: 'CM', preferredFoot: 'right', seed: 42 });
+  assert.ok(careerAchievements(s).every(a => !a.unlocked));
+  s = advanceCareer(s, { type: 'assess', performances: Object.fromEntries(ATTRIBUTES.map(k => [k, 65])) as Attributes });
+  s = advanceCareer(s, { type: 'train', focus: 'passing' });
+  const before = structuredClone(s);
+  assert.equal(careerAchievements(s).find(a => a.id === 'assessment')!.unlocked, true);
+  assert.equal(careerAchievements(s).find(a => a.id === 'training')!.progress, 1);
+  assert.equal(careerAchievements(s).find(a => a.id === 'goal')!.unlocked, false);
+  assert.deepEqual(s, before);
+  s.world.awards.push({ id: 'npc', season: 2026, competitionId: 'test', kind: 'champion', name: 'Campeão', playerId: 'npc', playerName: 'Outro', teamId: 'vale', value: 1 });
+  assert.equal(careerAchievements(s).find(a => a.id === 'trophy')!.unlocked, false);
+  s.world.awards.push({ ...s.world.awards[0]!, id: 'self', playerId: s.player.id });
+  s.development.goals = 5; s.development.appearances = 30;
+  assert.equal(careerAchievements(s).find(a => a.id === 'trophy')!.unlocked, true);
+  assert.equal(careerAchievements(s).find(a => a.id === 'goal')!.progress, 1);
+  assert.equal(careerAchievements(s).find(a => a.id === 'veteran')!.progress, 25);
+});

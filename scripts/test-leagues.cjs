@@ -22,7 +22,7 @@ const server = createServer(async (req, res) => {
     browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || (existsSync('/usr/bin/chromium') ? '/usr/bin/chromium' : undefined), headless: true, args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
     const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1 }); page.setDefaultTimeout(120000);
     const errors = []; page.on('pageerror', e => errors.push(e.message)); 
-    await page.goto(`http://127.0.0.1:${server.address().port}`);
+    await page.goto(`http://127.0.0.1:${server.address().port}`);await page.locator('[data-action="new"]').first().click();
     await page.locator('#create').waitFor();
     await page.locator('[data-action="world-pack"]').click();
     await page.getByText(/526 clubes ·/).first().waitFor();
@@ -57,14 +57,14 @@ const server = createServer(async (req, res) => {
     await page.locator('#competition-detail').evaluate(el=>el.scrollIntoView({block:'start'}));await page.screenshot({path:join(screenshots,'42-sudamericana.png')});
     const bolivia=await page.locator('#competition-select option').evaluateAll(items=>items.find(o=>o.value.endsWith(':league:Bolívia'))?.value);await page.locator('#competition-select').selectOption(bolivia);
     assert.match(await page.locator('#competition-detail').innerText(),/Dados insuficientes/);
-    await page.reload();await page.locator('#world-panel').waitFor();assert.ok(await page.locator('#competition-select option').count()>=180);
+    await page.reload();await page.locator('[data-action="continue"]').click();await page.locator('#world-panel').waitFor();assert.ok(await page.locator('#competition-select option').count()>=180);
     // Resume through the real save boundary, then exercise autonomous calendar progression in the UI.
     await page.evaluate(async()=>{
       const url=document.querySelector('script[type=module]').src,load=p=>import(url.replace('ui/browser.js',p));
       const [{loadCareerText,writeCareerText},{serializeSave,deserializeSave},{advanceCareer}]=await Promise.all(['persistence/browser-storage.js','persistence/save.js','application/career.js'].map(load));
       let s=deserializeSave(await loadCareerText());s=advanceCareer(s,{type:'assess',performances:Object.fromEntries(Object.keys(s.player.attributes).map(k=>[k,80]))});
       await writeCareerText(serializeSave(s));
-    });await page.reload();await page.locator('#world-panel').waitFor();
+    });await page.reload();await page.locator('[data-action="continue"]').click();await page.locator('#world-panel').waitFor();
     await page.locator('[data-action="advance-week"]').click();
     await page.waitForFunction(()=>!document.querySelector('#app').inert);
     const simulated=await page.evaluate(async()=>{const u=document.querySelector('script[type=module]').src;const a=await import(u.replace('ui/browser.js','persistence/browser-storage.js'));const b=await import(u.replace('ui/browser.js','persistence/save.js'));const s=b.deserializeSave(await a.loadCareerText());return {played:s.world.fixtures.filter(f=>f.homeGoals!==null).length,own:s.world.stats.filter(p=>p.playerId===s.player.id).length}});

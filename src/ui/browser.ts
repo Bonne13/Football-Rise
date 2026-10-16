@@ -1,8 +1,10 @@
+import { mainMenu, type MenuPage } from './main-menu.js';
+import type { SaveSlot } from '../persistence/save-library.js';
 import { membershipFor } from '../data/league-snapshots.js';
 import { ASSOCIATIONS } from '../data/associations.js';
 import { matchCrowd } from '../domain/match/crowd.js';
 import { NATIONAL_TEAMS } from '../data/competitions.js';
-import { loadCareerText, writeCareerText, deleteCareer } from '../persistence/browser-storage.js';
+import { loadCareerText, saveToSlot, listSaveSlots, activeSaveSlot, removeSaveSlot } from '../persistence/browser-storage.js';
 import { competitionHub, competitionDetail, leagueCatalog } from './competitions.js';
 import { stadiumFor } from '../data/stadiums.js';
 import { parseFootballPack, type FootballPack } from '../data/football-pack.js';
@@ -25,14 +27,18 @@ let selectedPack: FootballPack | null = null;
 try { const raw = localStorage.getItem('football-rise.data-pack.v1'); if (raw) selectedPack = parseFootballPack(raw); } catch {}
 let state: CareerState | null = null; let blocked = false; let timer: ReturnType<typeof setTimeout>;
 function message(text: string, error = false) { clearTimeout(timer); notice.textContent = text; notice.className = error ? 'error' : ''; notice.hidden = false; timer = setTimeout(() => { notice.hidden = true; }, 7000); }
+let page: MenuPage | 'career' | 'create' = 'home';
+let slots: SaveSlot[] = [];
+let activeSlot: string | null = null;
 let saving = false;
+function downloadSave(text: string) { const url = URL.createObjectURL(new Blob([text], { type: 'application/json' })); const a = document.createElement('a'); a.href = url; a.download = 'football-rise-save.json'; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 10000); }
 async function persist(next: CareerState) {
   if (saving) throw new Error('Aguarde o salvamento atual.');
   saving = true; app.inert = true; app.setAttribute('aria-busy', 'true');
-  try { await writeCareerText(serializeSave(next)); }
+  try { const id = activeSlot ?? `slot:${crypto.randomUUID()}`; await saveToSlot(serializeSave(next), id); activeSlot = id; slots = await listSaveSlots(); }
   finally { saving = false; app.inert = false; app.removeAttribute('aria-busy'); }
 }
-async function commit(next: CareerState) { await persist(next); state = next; blocked = false; render(); }
+async function commit(next: CareerState) { await persist(next); state = next; blocked = false; page = 'career'; render(); }
 async function dispatch(command: Command) { if (state) { await commit(advanceCareer(state, command)); message('Carreira atualizada e salva neste navegador.'); } }
 function field(label: string, name: string, value: string, extra = '') { return `<label ${['name', 'nationality'].includes(name) ? 'class="wide"' : ''}>${label}<input name="${name}" value="${esc(value)}" ${extra}></label>`; }
 function button(text: string, action: string, primary = false) { return `<button type="button" data-action="${action}" class="${primary ? 'primary' : ''}">${text}</button>`; }
@@ -55,16 +61,17 @@ let playing: { mode: DrillSession['mode']; focus: Focus | null } | null = null;
 let disposeField: (() => void) | undefined;
 const drillForFocus: Record<Focus, Drill> = { finishing: 'shoot', passing: 'pass', defending: 'vision', goalkeeping: 'vision', pace: 'speed', technique: 'technique', vision: 'vision', setPieces: 'freekick' };
 function startField(mode: DrillSession['mode'], focus: Focus | null = null) {
-  playing = { mode, focus }; render(); app.scrollIntoView({ block: 'start' });
+  page = 'career'; playing = { mode, focus }; render(); app.scrollIntoView({ block: 'start' });
 }
 function render() {
   disposeField?.(); disposeField = undefined;
   if (playing && state) {
     const career = state; const selection = playing;
-    const key = `football-rise.field.v1:${career.player.id}:${career.date}:${career.trainingSessions}:${selection.mode}:${selection.focus ?? ''}`;
+    const legacyKey = `football-rise.field.v1:${career.player.id}:${career.date}:${career.trainingSessions}:${selection.mode}:${selection.focus ?? ''}`;
+    const key = `${legacyKey}:${activeSlot ?? 'legacy'}`;
     const expected = createSession(selection.mode, career.rng, selection.focus ? drillForFocus[selection.focus] : 'shoot');
     let session = expected;
-    try { const raw = localStorage.getItem(key); if (raw) session = restoreSession(raw, expected); }
+    try { const raw = localStorage.getItem(key) ?? (slots.length === 1 ? localStorage.getItem(legacyKey) : null); if (raw) session = restoreSession(raw, expected); }
     catch { message('A sessão de campo não pôde ser retomada. Sua carreira foi preservada.', true); }
     app.innerHTML = '<div id="field-host"></div>';
     const fixture = career.world.fixtures.find(f => f.id === career.preparation?.fixtureId);
@@ -89,7 +96,8 @@ function render() {
       onExit: () => { playing = null; render(); },
     }); return;
   }
-  app.innerHTML = (blocked ? '<section class="card"><h2>Seu save foi preservado</h2><p>Não foi possível carregar a carreira. Baixe o save antes de importar outro.</p></section>' : '') + (state ? dashboard(state) : creation());
+  if (page !== 'career' && page !== 'create') { app.innerHTML = mainMenu(page, slots, activeSlot, state); return; }
+  app.innerHTML = '<div class="menu-back">' + button('← Menu principal', 'menu-home') + '</div>' + (blocked ? '<section class="card"><h2>Seu save foi preservado</h2><p>Não foi possível carregar a carreira. Baixe o save antes de importar outro.</p></section>' : '') + (page === 'career' && state ? dashboard(state) : creation());
 }
 
 app.addEventListener('submit', async e => {
@@ -104,18 +112,24 @@ app.addEventListener('submit', async e => {
 app.addEventListener('click', async e => {
   const b = (e.target as HTMLElement).closest<HTMLButtonElement>('button'); if (!b) return;
   try {
+    if (b.dataset.load) { const slot = slots.find(s => s.id === b.dataset.load); if (!slot) throw new Error('Save não encontrado.'); const next = deserializeSave(slot.text); await saveToSlot(slot.text, slot.id); activeSlot = slot.id; state = next; blocked = false; page = 'career'; slots = await listSaveSlots(); render(); return; }
+    if (b.dataset.download) { const slot = slots.find(s => s.id === b.dataset.download); if (slot) downloadSave(slot.text); return; }
+    if (b.dataset.delete) { const id = b.dataset.delete; if (!confirm('Excluir esta carreira? Baixe uma cópia antes. Esta ação não pode ser desfeita.')) return; await removeSaveSlot(id); if (activeSlot === id) { activeSlot = null; state = null; blocked = false; } slots = await listSaveSlots(); render(); return; }
     if (b.dataset.accept) { if (confirm('Assinar com este clube e encerrar as outras propostas?')) await dispatch({ type: 'accept', offerId: b.dataset.accept }); return; }
     const action = b.dataset.action;
+    if (action?.startsWith('menu-')) { const fromCreation = page === 'create'; page = action.slice(5) as MenuPage; if (fromCreation && !state) { const raw = await loadCareerText(); if (raw) { try { state = deserializeSave(raw); activeSlot = await activeSaveSlot(); } catch {} } } render(); window.scrollTo(0, 0); return; }
+    if (action === 'continue') { if (state) { page = 'career'; render(); } return; }
     if (action === 'community-pack' || action === 'world-pack') { b.disabled = true; try { await loadCommunityPack(action === 'world-pack'); } finally { b.disabled = false; } return; }
     if (action === 'default-pack') { localStorage.removeItem('football-rise.data-pack.v1'); selectedPack = null; render(); return; }
     if (action === 'assessment' || action === 'match') { startField(action); return; }
-    if (action === 'export') { const raw = await loadCareerText(); if (raw) { const url = URL.createObjectURL(new Blob([raw], { type: 'application/json' })); const a = document.createElement('a'); a.href = url; a.download = 'football-rise-save.json'; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 10000); } }
-    else if (action === 'new') { if (confirm('Baixou uma cópia? A nova carreira substituirá seu save.')) { await deleteCareer(); state = null; render(); } }
+    if (action === 'export') { const raw = activeSlot ? slots.find(s => s.id === activeSlot)?.text : await loadCareerText(); if (raw) downloadSave(raw); }
+    else if (action === 'new') { state = null; activeSlot = null; blocked = false; page = 'create'; render(); }
     else if (action === 'recover' || action === 'scout' || action === 'prepare' || action === 'promote' || action === 'advance-week' || action === 'renew') await dispatch({ type: action });
   } catch (err) { message(err instanceof Error ? err.message : 'Ação não concluída.', true); }
 });
 app.addEventListener('change', async e => {
   const input = e.target as HTMLInputElement;
+  if (input.dataset.setting) { try { localStorage.setItem(input.dataset.setting, input.value); message('Preferência salva.'); } catch { message('Não foi possível salvar a preferência.', true); } return; }
   if (input.id === 'competition-confederation' && state) {
     const select = app.querySelector<HTMLSelectElement>('#competition-select')!;
     for (const option of select.options) { option.hidden = option.disabled = input.value !== 'all' && option.dataset.region !== input.value; }
@@ -128,8 +142,16 @@ app.addEventListener('change', async e => {
     try { if (input.files[0].size > 10 * 1024 * 1024) throw new Error('Pacote excede 10 MB.'); const pack = parseFootballPack(await input.files[0].text()); localStorage.setItem('football-rise.data-pack.v1', JSON.stringify(pack)); selectedPack = pack; render(); message(`${pack.clubs.length} clubes carregados para a próxima carreira.`); } catch (error) { message(error instanceof Error ? error.message : 'Pacote inválido.', true); } return;
   }
   if (input.id !== 'import' || !input.files?.[0]) return;
-  try { const file = input.files[0]; if (file.size > 32 * 1024 * 1024) throw new Error('Save excede 32 MB.'); const next = deserializeSave(await file.text()); if ((state || blocked) && !confirm('Substituir o save deste navegador?')) return; await commit(next); message('Carreira importada.'); }
+  try { const file = input.files[0]; if (file.size > 32 * 1024 * 1024) throw new Error('Save excede 32 MB.'); const next = deserializeSave(await file.text()); activeSlot = null; await commit(next); message('Carreira importada.'); }
   catch (err) { message(err instanceof Error ? err.message : 'Save inválido.', true); } finally { input.value = ''; }
 });
-try { const raw = await loadCareerText(); if (raw) state = deserializeSave(raw); } catch { blocked = true; message('Não foi possível carregar o save. O original foi preservado.', true); }
+try {
+  const raw = await loadCareerText(); activeSlot = await activeSaveSlot();
+  if (raw) {
+    // Archive even an unreadable legacy payload before offering a new career.
+    if (!activeSlot) { activeSlot = `slot:${crypto.randomUUID()}`; await saveToSlot(raw, activeSlot); }
+    try { state = deserializeSave(raw); } catch { blocked = true; message('Save não reconhecido. O original está em Meus saves para download.', true); }
+  }
+  slots = await listSaveSlots();
+} catch { blocked = true; message('Não foi possível carregar os saves. Os originais foram preservados.', true); }
 render();

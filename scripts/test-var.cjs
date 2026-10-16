@@ -22,7 +22,7 @@ const server = createServer(async (req, res) => {
     browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || (existsSync('/usr/bin/chromium') ? '/usr/bin/chromium' : undefined), headless: true, args: ['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader'] });
     const page = await browser.newPage({ viewport: { width: 1280, height: 800 } }); page.setDefaultTimeout(120000);
     const errors = []; page.on('pageerror', e => errors.push(e.message)); await page.clock.install();
-    await page.goto(`http://127.0.0.1:${server.address().port}`); await page.locator('#create').waitFor();
+    await page.goto(`http://127.0.0.1:${server.address().port}`);await page.locator('[data-action="new"]').first().click(); await page.locator('#create').waitFor();
     async function setup(kind, mode = 'practice') {
       await page.evaluate(async ({kind, mode}) => {
         window.disposeVAR?.(); const url = document.querySelector('script[type=module]').src, load = path => import(url.replace('ui/browser.js',path));

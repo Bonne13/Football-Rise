@@ -24,7 +24,7 @@ const server = createServer(async (req, res) => {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
     const errors = []; page.on('pageerror', e => errors.push(e.message)); await page.clock.install();
     const origin = `http://127.0.0.1:${server.address().port}`;
-    await page.goto(origin);
+    await page.goto(origin);await page.locator('[data-action="new"]').first().click();
     await page.getByRole('button', { name: 'Usar base comunitária' }).click();
     await page.waitForFunction(() => localStorage.getItem('football-rise.data-pack.v1'));
     await page.getByText('Consultar clubes e jogadores', { exact: true }).click();
@@ -42,7 +42,7 @@ const server = createServer(async (req, res) => {
       s = career.advanceCareer(s, { type: 'accept', offerId: s.offers[0].id });
       await (await import(moduleURL.replace('ui/browser.js', 'persistence/browser-storage.js'))).writeCareerText(codec.serializeSave(s));
     });
-    await page.reload();
+    await page.reload();await page.locator('[data-action="continue"]').click();
     assert.equal(await page.locator('#world-panel').isVisible(), true);
     const champions = await page.locator('#competition-select option').evaluateAll(items => items.find(o => o.textContent.includes('Champions League'))?.value);
     await page.locator('#competition-select').selectOption(champions); assert.match(await page.locator('#competition-detail').innerText(), /Champions League/);
@@ -52,7 +52,7 @@ const server = createServer(async (req, res) => {
     await page.waitForFunction(() => document.querySelector('.wardrobe h2')?.textContent === 'Sua camisa · 99');
     assert.equal(await page.locator('.wardrobe h2').innerText(), 'Sua camisa · 99');
     await page.getByLabel('Uniforme de jogo').selectOption('2'); await page.getByRole('button', { name: 'Usar uniforme' }).click(); await page.waitForFunction(() => !document.querySelector('#app')?.hasAttribute('aria-busy'));
-    await page.reload(); assert.equal(await page.getByLabel('Uniforme de jogo').inputValue(), '2');
+    await page.reload();await page.locator('[data-action="continue"]').click(); assert.equal(await page.getByLabel('Uniforme de jogo').inputValue(), '2');
     await page.getByRole('button', { name: 'Preparar próxima partida' }).click();
     await page.getByRole('button', { name: 'Entrar em campo' }).click(); await page.clock.runFor(50);
     const clock = await page.locator('#field-clock').innerText();

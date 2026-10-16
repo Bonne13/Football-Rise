@@ -100,3 +100,9 @@ Dois bandeirinhas ligados à linha de impedimento e à participação do recepto
 ### Revisão de condução e troca de temporada
 
 Três circuitos distintos, portões físicos numerados, ritmo analógico e aceleração por Shift/dois dedos. Oportunidades de partida usam defensores e corredores, com recuperação real da posse e continuidade da bola para a finalização. Playoffs e acesso/descenso ingleses e trocas Série A/B são executados somente com cadastros completos; o pacote parcial da Série B não inventa participantes. Divisões persistem após a virada. Prorrogação por fase em novos regulamentos; edições antigas preservadas. Vagas continentais oficiais e demais sistemas de acesso/descenso continuam pendentes. Prévia visual permanece separada da publicação do jogo.
+
+### Menu inicial e múltiplas carreiras
+- Tela de entrada com continuar, nova carreira, biblioteca de saves, configurações e conquistas.
+- Slots independentes com importação/exportação, exclusão confirmada e migração não destrutiva do save anterior.
+- Configurações compartilhadas com o pause; conquistas derivadas de avaliação, treinos, contrato, partidas, gols, assistências e premiações.
+- Validação: testes de regras e persistência alternativa; teste de navegador `test:menu` em layout desktop/celular e integração com campo.

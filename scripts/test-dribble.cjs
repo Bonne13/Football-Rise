@@ -20,7 +20,7 @@ const server = createServer(async (req, res) => {
  await new Promise(r=>server.listen(0,'127.0.0.1',r));let browser;
  try{
   browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||(existsSync('/usr/bin/chromium')?'/usr/bin/chromium':undefined),headless:true,args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
-  const page=await browser.newPage({viewport:{width:1280,height:800},deviceScaleFactor:1});page.setDefaultTimeout(120000);const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.clock.install();await page.goto(`http://127.0.0.1:${server.address().port}`);await page.locator('#create').waitFor();
+  const page=await browser.newPage({viewport:{width:1280,height:800},deviceScaleFactor:1});page.setDefaultTimeout(120000);const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.clock.install();await page.goto(`http://127.0.0.1:${server.address().port}`);await page.locator('[data-action="new"]').first().click();await page.locator('#create').waitFor();
   async function field(mode='practice',seed=42){
    await page.evaluate(async({mode,seed})=>{
     window.disposeDribble?.();localStorage.setItem('football-rise.graphics.v1','low');const u=document.querySelector('script[type=module]').src,load=p=>import(u.replace('ui/browser.js',p));const [{mountField},{createSession},{createCareer},{clubKits,trainingKit},{stadiumFor}]=await Promise.all(['ui/field.js','application/drills.js','application/career.js','data/kits.js','data/stadiums.js'].map(load));
