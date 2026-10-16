@@ -1,4 +1,5 @@
 import type * as T from 'three';
+import { buildSurroundings } from './stadium-surroundings.js';
 import type { StadiumProfile } from '../data/stadiums.js';
 declare const THREE: typeof T;
 /** Batch static boxes without changing their transforms, reducing draw calls on phones. */
@@ -178,39 +179,18 @@ export function buildStadium(scene: T.Scene, profile: StadiumProfile, colors: { 
   const screenMaterial = new THREE.MeshBasicMaterial({ map: screenTexture });
   const scoreboard = new THREE.Mesh(new THREE.PlaneGeometry(9, 3.4), screenMaterial); scoreboard.position.set(0, rows * .56 + 5.1, -rows * 1.05 - 10); scene.add(scoreboard);
   for (const x of [-3.8, 3.8]) box(scene, [.18, 5, .2], [x, rows * .56 + 2.6, -rows * 1.05 - 10.1], dark);
-  // Curving access path outside the bowl, visible at the corners and through low stands.
-  const path = new THREE.Mesh(new THREE.RingGeometry(Math.max(76, sideX + rows * 1.05 + 12), Math.max(81, sideX + rows * 1.05 + 17), 80), material('#7b817b')); path.rotation.x = -Math.PI / 2; path.scale.y = 1.2; path.position.set(0, -.045, 52.5); scene.add(path);
-  if (profile.landscape === 'urban') {
-    const count = profile.size === 'arena' ? 80 : 40;
-    const buildings = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), material('#a1aeb0'), count);
-    const windows = new THREE.InstancedMesh(new THREE.BoxGeometry(.8, 1, .03), new THREE.MeshStandardMaterial({ color: '#a9ced0', metalness: .25, roughness: .45 }), count * 48);
-    const transform = new THREE.Object3D();
-    for (let i = 0; i < count; i++) {
-      const angle = i / count * Math.PI * 2 + (random() - .5) * .045, radius = 108 + random() * 55, height = 7 + random() * (profile.size === 'arena' ? 42 : 18), width = 5 + random() * 7, depth = 5 + random() * 8;
-      const x = Math.cos(angle) * radius, z = 52.5 + Math.sin(angle) * radius * 1.2;
-      transform.position.set(x, height / 2, z); transform.scale.set(width, height, depth); transform.updateMatrix(); buildings.setMatrixAt(i, transform.matrix);
-      buildings.setColorAt(i, new THREE.Color(['#9eafba', '#a5b0aa', '#b8aaa0', '#748d9a'][i % 4]));
-      for (let w = 0; w < 48; w++) { transform.position.set(x + ((w % 4) - 1.5) * width / 5, 1.5 + Math.floor(w / 4) * height / 13, z + depth / 2 + .03); transform.scale.set(1, 1.4, 1); transform.updateMatrix(); windows.setMatrixAt(i * 48 + w, transform.matrix); }
-    }
-    // Streets and small parked cars avoid a perfectly circular city wall.
-    for (const z of [-95, 188]) {
-      box(scene, [380, .025, 9], [0, -.035, z], material('#424e54'));
-      for (let x = -150; x < 150; x += 12) box(scene, [4, .028, .18], [x, -.018, z], pale);
-      for (let i = 0; i < 13; i++) box(scene, [2, 1.1, 4], [-145 + i * 23, .55, z + 2.5], i % 2 ? dark : pale);
-    }
-    buildings.instanceMatrix.needsUpdate = windows.instanceMatrix.needsUpdate = true; scene.add(buildings, windows);
-  } else if (profile.landscape === 'coastal') {
-    const ocean = new THREE.Mesh(new THREE.PlaneGeometry(500, 1000), new THREE.MeshStandardMaterial({ color: '#176f8c', roughness: .32, metalness: .18 })); ocean.rotation.x = -Math.PI / 2; ocean.position.set(0, -.055, -565); scene.add(ocean);
-    const sand = new THREE.Mesh(new THREE.PlaneGeometry(500, 20), material('#d5c38e')); sand.rotation.x = -Math.PI / 2; sand.position.set(0, -.05, -62); scene.add(sand);
-    for (let i = 0; i < 10; i++) {
-      const foam = box(scene, [450 - i * 5, .012, .32], [Math.sin(i) * 10, -.025, -75 - i * 9], material(i % 2 ? '#71bcc3' : '#a6d3cf')); foam.rotation.y = Math.sin(i) * .008;
-    }
+  const footprint = { halfX: sideX + rows * 1.05 + 4, halfZ: 52.5 + endZ + rows * 1.05 + 4 };
+  buildSurroundings(scene, profile, footprint);
+  // Coast is a distant landscape, not a beach forced against every coastal club's stands.
+  if (profile.landscape === 'coastal') {
+    const ocean = new THREE.Mesh(new THREE.PlaneGeometry(1400, 1000), new THREE.MeshStandardMaterial({ color: '#287f96', roughness: .38, metalness: .12 })); ocean.rotation.x = -Math.PI / 2; ocean.position.set(0, -.055, -920); scene.add(ocean);
+    const sand = new THREE.Mesh(new THREE.PlaneGeometry(1400, 16), material('#cdbd96')); sand.rotation.x = -Math.PI / 2; sand.position.set(0, -.05, -416); scene.add(sand);
   }
   if (profile.landscape === 'mountains' || profile.landscape === 'rural') {
     const terrain = new THREE.PlaneGeometry(1000, 1000, 64, 64), positions = terrain.getAttribute('position'); const vertexColors: number[] = [];
     const amplitude = profile.landscape === 'mountains' ? 90 : 24;
     for (let i = 0; i < positions.count; i++) {
-      const x = positions.getX(i), y = positions.getY(i), distance = Math.hypot(x, y * .8), gain = Math.max(0, Math.min(1, (distance - 125) / 150));
+      const x = positions.getX(i), y = positions.getY(i), distance = Math.hypot(x, y * .8), gain = Math.max(0, Math.min(1, (distance - 320) / 180));
       const h = Math.max(0, Math.sin(x * .016 + profile.seed % 31) * .55 + Math.cos(y * .023) * .35 + Math.sin((x + y) * .01) * .25 + .45) * amplitude * gain;
       positions.setZ(i, h);
       const color = new THREE.Color(h > 65 ? '#818d83' : h > 30 ? '#536e54' : '#668455'); vertexColors.push(color.r, color.g, color.b);
@@ -218,16 +198,5 @@ export function buildStadium(scene: T.Scene, profile: StadiumProfile, colors: { 
     terrain.setAttribute('color', new THREE.Float32BufferAttribute(vertexColors, 3)); terrain.computeVertexNormals();
     const hills = new THREE.Mesh(terrain, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 })); hills.rotation.x = -Math.PI / 2; hills.position.set(0, -.6, 52.5); scene.add(hills);
   }
-  const treeCount = profile.landscape === 'urban' ? 30 : 90;
-  const trees = new THREE.InstancedMesh(new THREE.SphereGeometry(2.3, 8, 6), material(profile.country === 'Brasil' ? '#285a3b' : '#375a40'), treeCount);
-  const trunks = new THREE.InstancedMesh(new THREE.CylinderGeometry(.22, .4, 3, 5), material('#705b42'), treeCount);
-  let planted = 0;
-  for (let i = 0; i < treeCount; i++) {
-    const angle = random() * Math.PI * 2, radius = Math.max(83, sideX + rows * 1.05 + 20) + random() * 20, x = Math.cos(angle) * radius, z = 52.5 + Math.sin(angle) * radius * 1.2;
-    if (profile.landscape === 'coastal' && z < -50) continue;
-    const treeScale = .75 + random() * .65; const treeTransform = new THREE.Object3D(); treeTransform.position.set(x, 4.7 * treeScale, z); treeTransform.scale.set(treeScale, (profile.country === 'Brasil' ? 1.2 : 1.65) * treeScale, treeScale); treeTransform.updateMatrix(); trees.setMatrixAt(planted, treeTransform.matrix); trunks.setMatrixAt(planted, new THREE.Matrix4().makeTranslation(x, 1.5, z)); planted++;
-  }
-  trees.count = trunks.count = planted;
-  trees.instanceMatrix.needsUpdate = trunks.instanceMatrix.needsUpdate = true; scene.add(trees, trunks);
   consolidateBoxes(scene);
 }

@@ -24,7 +24,8 @@ const server = createServer(async (req, res) => {
     const errors = []; page.on('pageerror', e => errors.push(e.message)); await page.clock.install();
     await page.goto(`http://127.0.0.1:${server.address().port}`);
     await page.locator('#create').waitFor();
-    for (const [name, file] of [['Flamengo','27-maracana'],['Botafogo','27-nilton-santos'],['Liverpool','27-anfield'],['Real Madrid','27-bernabeu'],['Bayern München','27-allianz-arena'],['Santos','27-vila-belmiro'],['Inter','27-san-siro']]) {
+    const cases = process.env.SURROUNDINGS_REVIEW ? [['Vasco','29-sao-januario'],['Santos','29-vila-belmiro'],['Bournemouth','29-dean-court'],['Eibar','29-ipurua'],['Flamengo','29-maracana']] : [['Flamengo','27-maracana'],['Botafogo','27-nilton-santos'],['Liverpool','27-anfield'],['Real Madrid','27-bernabeu'],['Bayern München','27-allianz-arena'],['Santos','27-vila-belmiro'],['Inter','27-san-siro']];
+    for (const [name, file] of cases) {
       const stadiumName = await page.evaluate(async name => {
         window.disposeControls?.();
         const url=document.querySelector('script[type=module]').src, load=p=>import(url.replace('ui/browser.js',p));
@@ -43,11 +44,12 @@ const server = createServer(async (req, res) => {
       await page.screenshot({path:join(screenshots,file+'.png')});
       await page.locator('#field-return').click(); await page.clock.runFor(50);
       assert.equal(await page.locator('#field-clock').innerText(),clock);
+      if (process.env.SURROUNDINGS_REVIEW) await page.screenshot({path:join(screenshots,file.replace('29-','30-field-')+'.png')});
       console.log('Captured',name,stadiumName);
     }
     await page.setViewportSize({width:390,height:844});await page.clock.runFor(50);
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
-    await page.screenshot({path:join(screenshots,'28-stadium-mobile.png')});
-    assert.deepEqual(errors,[]);console.log('Stadiums passed: seven ground profiles, WebGL, approximate reference captions, panorama/return without time advance and mobile layout.');
+    await page.screenshot({path:join(screenshots,process.env.SURROUNDINGS_REVIEW ? '31-surroundings-mobile.png' : '28-stadium-mobile.png')});
+    assert.deepEqual(errors,[]);console.log(`Stadiums passed: ${cases.length} ground profiles, WebGL, approximate reference captions, panorama/return without time advance and mobile layout.`);
   } finally {await browser?.close();await new Promise(r=>server.close(r));}
 })().catch(e=>{console.error(e);process.exitCode=1});
