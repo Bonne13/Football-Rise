@@ -56,6 +56,7 @@ test('invalid gameplay inputs fail and tick substeps preserve frame-rate outcome
   const t = createTrial('shoot', 1, 42);
   assert.throws(() => controlTrial(t, { type: 'kick', aim: { x: NaN, y: 60 }, curve: 0, lift: 0 }));
   assert.throws(() => tickTrial(t, -1));
+  assert.throws(() => createTrial('shoot', 1, 42.5));
   const a = createTrial('speed', 1, 42), b = structuredClone(a); a.started = b.started = true;
   for (let i = 0; i < 40; i++) tickTrial(a, .2); for (let i = 0; i < 400; i++) tickTrial(b, .02);
   assert.equal(a.outcome, b.outcome); assert.equal(a.score, b.score);
@@ -103,4 +104,35 @@ test('gesture charge and player attributes determine strike speed independently 
   controlTrial(fast, { type: 'kick', aim: fast.target, curve: 0, lift: 0, velocity: strikeVelocity(strong, 'shoot', 1) });
   assert.ok(fast.shot!.duration < trial.shot!.duration);
   assert.throws(() => strikeVelocity(strong, 'shoot', NaN));
+});
+
+test('each drill cycles through three reproducible layouts, with different shooting positions and courses', () => {
+  for (const kind of ['shoot', 'freekick', 'pass', 'vision', 'technique', 'speed'] as const) {
+    const variants = [1, 2, 3].map(attempt => createTrial(kind, attempt, 42));
+    assert.equal(new Set(variants.map(t => t.layout)).size, 3);
+    assert.deepEqual(variants[1], createTrial(kind, 2, 42));
+    if (kind === 'shoot' || kind === 'freekick' || kind === 'pass') assert.equal(new Set(variants.map(t => JSON.stringify(t.origin))).size, 3);
+    if (kind === 'technique') assert.equal(new Set(variants.map(t => JSON.stringify(t.gates))).size, 3);
+    if (kind === 'speed') assert.equal(new Set(variants.map(t => JSON.stringify(t.obstacles))).size, 3);
+    assert.notEqual(createTrial(kind, 1, 43).layout, variants[0]!.layout);
+    for (const t of variants) {
+      assert.ok(t.gates.every(p => p.x >= 20 && p.x <= 860 && p.y >= 100 && p.y <= 1290));
+      assert.ok(t.cones.every(p => p.x >= 20 && p.x <= 860 && p.y >= 100 && p.y <= 1290));
+    }
+  }
+});
+test('moving receivers vary by scenario without changing their seeded trajectories', () => {
+  assert.notDeepEqual(teammateAt(.85, 1), teammateAt(.85, 2));
+  for (const layout of [0, 1, 2]) assert.deepEqual(teammateAt(.85, layout), teammateAt(.85, layout));
+});
+
+test('all dribbling layouts can be completed through the ordered gates', () => {
+  for (const attempt of [1, 2, 3]) {
+    const t = createTrial('technique', attempt, 42);
+    for (const gate of t.gates) {
+      controlTrial(t, { type: 'move', destination: gate });
+      for (let i = 0; i < 220 && !t.resolved && Math.hypot(t.player.x - gate.x, t.player.y - gate.y) > 3; i++) tickTrial(t, .05);
+    }
+    assert.equal(t.outcome, 'complete'); assert.equal(t.gate, 5); assert.ok(t.score > 0);
+  }
 });

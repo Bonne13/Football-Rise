@@ -36,7 +36,7 @@ O jogador controla o próprio atleta nas partidas. **Football Rise não é apena
 
 Em desenvolvimento — fundação da engine de carreira e primeira vertical slice.
 
-## Jogar no navegador (celular)
+## Jogar no navegador (computador e celular)
 
 O site está preparado para GitHub Pages. Acesse o endereço exibido na última execução bem-sucedida de **Actions → Publicar Football Rise**. O endereço padrão esperado é `https://bonne13.github.io/Football-Rise/`; ele só funciona depois de habilitar o Pages e concluir o deploy.
 
@@ -44,7 +44,7 @@ Para a primeira ativação, o proprietário deve abrir **Settings → Pages → 
 
 O fluxo começa aos 14 anos (opções 15/16), passa por avaliação jogável, treino, propostas, contrato, papel na base e estreia por oportunidades controláveis. Desempenho permite promoção aos 15/16 e propostas de outras bases ou principais durante a temporada. A avaliação e a atuação recebem notas calculadas no campo, sem digitação manual. Partidas completas, ligas e mercado global continuam nas fases seguintes.
 
-O save fica no navegador. **Baixar save** e **Importar save** transferem a carreira entre aparelhos; guarde um arquivo antes de limpar os dados do site. Formato `schemaVersion: 1`, com estado do RNG e validação no carregamento. Clubes e valores são fictícios, sem ativos protegidos.
+O save fica no navegador. **Baixar save** e **Importar save** transferem a carreira entre aparelhos; guarde um arquivo antes de limpar os dados do site. Formato `schemaVersion: 2`, com migração automática de saves v1 e validação no carregamento. Há clubes fictícios e uma base comunitária opcional de 238 clubes e 4.605 registros nominais de jogadores. Ela cobre parcialmente Europa 2026/27 e Brasil 2026. Vínculos, números e uniformes têm limitações explícitas em [Fontes e cobertura](docs/data/SOURCES.md); os uniformes não são reproduções oficiais verificadas.
 
 ### Desenvolvimento
 
@@ -63,7 +63,7 @@ Publique somente `dist-web/`. Os caminhos relativos funcionam no subdiretório `
 
 O início foi inspirado na sequência do Game-teste: **finalização, visão, passe, velocidade, condução e falta**, com três tentativas por fundamento. As regras foram reimplementadas modularmente; o outro repositório não foi modificado.
 
-- **Chute/passe/falta:** toque ou deslize no gol/gramado para escolher o destino. Só depois aparece a bola de controle: escolha o contato, puxe para baixo e solte. Deslizar no campo ajusta a mira e nunca chuta.
+- **Chute/passe/falta:** arraste para trás no campo para definir mira e força. Solte para confirmar. Só então aparece a bola: clique/toque nela para escolher a curva e executar com a mira e força guardadas. Não há segunda puxada.
 - **Visão:** encontre um companheiro azul livre, observe a linha laranja de impedimento e evite os defensores vermelhos.
 - **Velocidade:** toque no lado esquerdo/direito ou nos botões para trocar de faixa e desviar dos obstáculos.
 - **Condução:** toque no destino para mover jogador e bola, complete os portões em ordem e evite cones.
@@ -76,14 +76,34 @@ Depois da avaliação, **Praticar no campo** usa três tentativas e aplica desen
 
 O campo usa WebGL/Three.js com câmera por trás do jogador, bola esférica texturizada, jogadores, goleiro, trave/rede, trajetória e rastro em 3D. As geometrias são procedurais; a biblioteca Three.js é distribuída localmente com sua licença MIT, sem depender de CDN.
 
-1. **Toque ou deslize dentro do gol** para escolher a mira (no gramado em passes). O gol fica ampliado e um marcador mostra o destino. Toques fora da rede não iniciam o chute.
-2. **A bola de controle só aparece depois de confirmar a mira.** Nela, toque no ponto desejado: nas laterais produz efeito; embaixo aumenta a elevação. Um toque simples escolhe o contato e não chuta.
-3. **Puxe essa bola para baixo** para carregar a potência e solte. Em 100%, a trajetória alcança a mira selecionada; puxadas menores produzem bolas mais curtas.
+1. **Puxe para trás no campo** com mouse ou dedo. O deslocamento lateral reverso mira, e a distância da puxada dosa força. A barra mostra percentual e velocidade calculada pelos atributos do atleta.
+2. **Solte para confirmar mira e força.** A bola de curva aparece somente depois. Clique/toque no centro para chute reto ou nas laterais para curva; soltar esse toque executa.
+3. **Refazer mira** é opcional: descarta a preparação e permite outro gesto. Pausar conserva os valores já confirmados. A câmera mantém o enquadramento entre as etapas, sem ampliar o gol antes da mira.
 
-Arrastar no campo agora serve somente para ajustar a mira; o chute é executado pela bola de controle. **Alterar mira** oculta a bola e volta ao enquadramento ampliado do gol. A linha e o marcador 3D mostram o destino antes do chute, e os controles de efeito/elevação também podem ser ajustados pelos seletores. Passes e condução selecionam destinos por raycasting no gramado. A câmera acompanha o jogador na condução.
+Passe, visão, técnica e velocidade usam zonas de meio-campo; chutes/faltas variam lado e distância. Há três cenários por fundamento, reproduzíveis pela seed e tentativa. A câmera acompanha o jogador na condução. No teclado, setas ajustam antes de confirmar, espaço confirma/executa e Escape pausa.
+
+No **Vestiário**, escolha número de 1 a 99 e um dos três uniformes. Números livres são imediatos; ocupados exigem a confiança e OVR exibidos. Nos treinos o atleta veste colete laranja. Na nova carreira, o botão **Usar base comunitária 2026/27** carrega o catálogo de clubes e jogadores; a seleção não altera carreiras existentes. Pacotes próprios podem ser importados pelo formato documentado em [docs/data/SOURCES.md](docs/data/SOURCES.md).
 
 Para celulares sem WebGL, o jogo avisa e abre o campo 2D automaticamente, mantendo a seleção da mira e um controle de bola desenhado em 2D. O modo gráfico não modifica o formato dos saves ou as regras de resultados.
 
 ### Teste de regressão dos controles
 
-`npm run test:browser` gera o site e abre um servidor temporário para testar toques reais em Chromium: bola oculta antes da mira, rejeição de toques fora do gol, arrasto de mira sem chute, alteração de destino, contato sem disparo, potência e gol, retomada e tela de 320 px. Use Chromium em `/usr/bin/chromium`, informe `CHROMIUM_PATH` ou instale o navegador com `npx playwright install chromium`. Playwright é uma dependência só de desenvolvimento. As capturas ficam em `football-rise-browser/` no diretório temporário do sistema.
+`npm run test:browser` verifica a sequência com toque, cancelamento, potência guardada, curva, pausa/som, saída com salvamento, retomada e layout de 320 px. `npm run test:desktop` verifica catálogo comunitário, disputa por número, escolha de uniforme, persistência e o mesmo fluxo com mouse, incluindo câmera sem salto ao confirmar. Ambos geram o site e fecham servidor/navegador ao terminar.
+
+Use Chromium em `/usr/bin/chromium`, informe `CHROMIUM_PATH` ou instale com `npx playwright install chromium`. Playwright é dependência só de desenvolvimento. Capturas ficam em `football-rise-browser/` no diretório temporário do sistema.
+
+### Estádios e revisão visual
+
+Os estádios procedurais têm quatro arquibancadas, dois gols, tamanhos local/regional/arena e paisagens urbanas, montanhosas, rurais ou costeiras. Clube, país e cidades catalogadas selecionam o perfil; são cenários simulados, sem reprodução oficial de estádios reais. **Pausar → Conhecer o estádio** abre a visão panorâmica com o exercício congelado.
+
+Após `npm run build:web`, `node scripts/capture-review.cjs` produz capturas reais em `/tmp/football-rise-review/` para revisão antes de publicar. A geração de capturas não faz commit ou deploy.
+
+### Competições e sala de troféus — prévia v3
+
+A carreira agora integra liga da base/principal, copas nacionais, catálogo dos 27 estaduais brasileiros, Libertadores, Champions League, Europa League, Conference League e Copa do Mundo. No painel **Calendário e competições**, acompanhe tabelas, grupos, mata-mata, pênaltis, resultados e artilharia. Os outros clubes jogam mesmo sem participação do protagonista. Competições sem clubes suficientes ficam identificadas como indisponíveis. Os formatos/calendários são compactos e simulados; participantes e regulamentos oficiais completos ainda não são reproduzidos. As limitações estão em [ARCHITECTURE.md](docs/ARCHITECTURE.md#competições-calendário-e-premiações--save-v3).
+
+A base não disputa automaticamente torneios adultos. Convocação para a Copa exige principal, idade, habilidade, confiança, minutos e desempenho. Há premiações de campeão, artilheiro, melhor jogador, revelação, goleiro, seleção do torneio e jogador da temporada, calculadas a partir das atuações. A **Sala de troféus** conserva suas conquistas. **Avançar uma semana sem atuar** simula o calendário sem inventar estatísticas para seu atleta.
+
+O formato atual é `schemaVersion: 3`, com migração de saves v1/v2. O navegador usa IndexedDB para acomodar o calendário, preservando exportação/importação e fallback legado. O limite por save é 32 MB; pacotes de dados mantêm o limite de 10 MB. Renovação permite continuar além do primeiro contrato, nos últimos seis meses e com confiança suficiente.
+
+O menu de pausa também tem **Ver jogador** e qualidade gráfica **Automática / Alta / Leve**. O jogo permanece por oportunidades controláveis, sem afirmar uma partida completa de 90 minutos com 22 jogadores de IA.

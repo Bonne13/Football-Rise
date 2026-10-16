@@ -5,7 +5,7 @@ export type Drill = typeof DRILLS[number];
 export interface Point { x: number; y: number }
 export interface Shot { from: Point; end: Point; curve: number; lift: number; elapsed: number; duration: number; receiver: Point | null; offside: boolean; keeper: number }
 export interface Trial {
-  kind: Drill; attempt: number; time: number; started: boolean; resolved: boolean; score: number;
+  kind: Drill; attempt: number; layout: number; time: number; started: boolean; resolved: boolean; score: number;
   message: string; outcome: 'goal' | 'save' | 'wide' | 'wall' | 'received' | 'intercepted' | 'offside' | 'complete' | 'timeout' | null;
   origin: Point; aim: Point; target: Point; shot: Shot | null; player: Point; destination: Point | null;
   gates: Point[]; gate: number; cones: Point[]; collisions: number; touching: boolean;
@@ -16,7 +16,7 @@ export type TrialInput = { type: 'kick'; aim: Point; curve: number; lift: number
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
 const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
 export function keeperAt(time: number) { return 440 + Math.sin(time * 1.8) * 135; }
-export function teammateAt(time: number): Point { return { x: 320 + Math.sin(time * 1.25) * 150, y: 210 }; }
+export function teammateAt(time: number, layout = 0): Point { return { x: 320 + layout * 70 + Math.sin(time * 1.25 + layout * .8) * 150, y: 210 + layout * 100 }; }
 export function ballPath(from: Point, to: Point, fraction: number, curve: number): Point {
   return { x: from.x + (to.x - from.x) * fraction + 640 * fraction * (1 - fraction) * curve, y: from.y + (to.y - from.y) * fraction };
 }
@@ -29,9 +29,10 @@ export function isOffside(receiver: Point, ball: Point, opponents: Point[]) {
   return receiver.y < 660 && receiver.y < ball.y && receiver.y < line - .001;
 }
 export function createTrial(kind: Drill, attempt: number, seed: number, accuracy = 100): Trial {
-  requireRule(DRILLS.includes(kind) && Number.isInteger(attempt) && attempt >= 1, 'Fundamento inválido.'); bounded(seed, 0, 0xffffffff); bounded(accuracy, 1, 100);
+  requireRule(DRILLS.includes(kind) && Number.isInteger(attempt) && attempt >= 1, 'Fundamento inválido.'); bounded(seed, 0, 0xffffffff); requireRule(Number.isInteger(seed), 'Seed inválida.'); bounded(accuracy, 1, 100);
+  const layout = (seed % 3 + attempt - 1) % 3;
   const side = draw((seed + attempt) >>> 0, 0, 1).value;
-  return { kind, attempt, time: 0, started: false, resolved: false, score: 0, message: '', outcome: null,
+  const trial: Trial = { kind, attempt, layout, time: 0, started: false, resolved: false, score: 0, message: '', outcome: null,
     origin: { x: 440, y: kind === 'freekick' ? 1100 : 950 }, aim: { x: 440, y: 65 }, target: { x: side ? 580 : 300, y: 60 },
     shot: null, player: { x: 440, y: 1170 }, destination: null,
     gates: [{ x: 440, y: 1010 }, { x: 230, y: 820 }, { x: 630, y: 640 }, { x: 300, y: 440 }, { x: 440, y: 260 }], gate: 0,
@@ -39,6 +40,18 @@ export function createTrial(kind: Drill, attempt: number, seed: number, accuracy
     lane: 1, distance: 0, obstacles: Array.from({ length: 8 }, (_, i) => ({ distance: 15 + i * 10, lane: (i * 2 + attempt) % 3, passed: false })),
     mates: [{ x: 150, y: 310 }, { x: 330, y: 120 }, { x: 560, y: 330 }, { x: 740, y: 280 }],
     defenders: [{ x: 400, y: 250 }, { x: 560, y: 370 }, { x: 740, y: 320 }], offsideLine: 250, accuracy };
+  if (layout) {
+    if (kind === 'shoot') trial.origin = layout === 1 ? { x: 250, y: 850 } : { x: 650, y: 1200 };
+    else if (kind === 'freekick') trial.origin = layout === 1 ? { x: 280, y: 1050 } : { x: 630, y: 1250 };
+    else trial.origin = { x: layout === 1 ? 250 : 640, y: 1000 + layout * 60 };
+    const variant = (p: Point, index: number) => ({ x: layout === 1 ? 880 - p.x : clamp(p.x + (index % 2 ? 90 : -80), 100, 780), y: p.y + (layout === 2 ? 35 : 0) });
+    trial.gates = trial.gates.map(variant); trial.cones = trial.cones.map(variant);
+    trial.player = { x: layout === 1 ? 620 : 220, y: 1200 };
+    trial.mates = trial.mates.map(variant); trial.defenders = trial.defenders.map(variant);
+    trial.offsideLine = layout === 2 ? 285 : 250;
+    trial.obstacles.forEach((o, i) => { o.lane = (o.lane + layout + i % 2) % 3; o.distance += i % 2 ? layout * 2 : 0; });
+  }
+  return trial;
 }
 function finish(t: Trial, score: number, message: string, outcome: Trial['outcome']) {
   t.resolved = true; t.score = Math.round(clamp(score, 0, 100)); t.message = message; t.outcome = outcome;
@@ -77,7 +90,7 @@ function step(t: Trial, dt: number) {
     if (t.kind === 'pass' || t.kind === 'vision') {
       if (blockedPath(s.from, s.end, t.defenders, s.curve)) { finish(t, 0, 'Passe interceptado. Procure uma linha livre.', 'intercepted'); return; }
       if (s.offside) { finish(t, 0, 'Impedimento! Observe a linha laranja.', 'offside'); return; }
-      const gap = distance(s.end, s.receiver ?? teammateAt(t.time));
+      const gap = distance(s.end, s.receiver ?? teammateAt(t.time, t.layout));
       finish(t, gap < 65 ? 100 - gap : 0, gap < 65 ? 'Passe recebido! Boa leitura da jogada.' : 'O passe não encontrou o companheiro. Antecipe o movimento.', gap < 65 ? 'received' : 'wide'); return;
     }
     if (t.kind === 'freekick' && s.lift < .6 && blockedPath(s.from, s.end, [{ x: 360, y: 720 }, { x: 410, y: 720 }, { x: 460, y: 720 }, { x: 510, y: 720 }], s.curve)) { finish(t, 0, 'Na barreira! Use efeito ou elevação.', 'wall'); return; }

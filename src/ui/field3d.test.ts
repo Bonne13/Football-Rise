@@ -15,3 +15,12 @@ test('contact on the lower half lifts the ball, side contact curves it, and cont
   const edge = contactEffects(1, 1);
   assert.ok(Math.hypot(edge.x, edge.y) <= .95 + 1e-10);
 });
+
+test('passing, vision, dribbling and sprinting are placed in midfield zones, away from the box', async () => {
+  const { fieldZone } = await import('./field3d.js');
+  for (const kind of ['pass', 'vision', 'technique', 'speed'] as const) {
+    assert.equal(new Set([0, 1, 2].map(layout => fieldZone(kind, layout))).size, 3);
+    for (const layout of [0, 1, 2]) assert.ok(fieldZone(kind, layout) > 16.5);
+  }
+  for (const kind of ['shoot', 'freekick'] as const) assert.equal(fieldZone(kind, 0), 0);
+});

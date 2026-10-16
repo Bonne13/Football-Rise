@@ -82,3 +82,9 @@
 
 ## Regra de execução
 Não tentar terminar uma fase inteira antes de termos algo executável. Construir em pequenos cortes verticais e manter testes passando a cada mudança.
+
+## Corte funcional de competições e apresentação (prévia em revisão)
+
+O corte atual liga calendário, ligas por país/base, copas nacionais/estaduais, Libertadores, torneios europeus, Copa do Mundo simulada, estatísticas, premiações e histórico de temporadas à carreira. Os formatos são compactos; não concluem toda a Fase 3 nem eliminatórias/seleções completas da Fase 7. Permanecem pendentes separação integral das divisões, promoção/rebaixamento das ligas, regulamentos e qualificação oficiais completos, adversários táticos em partidas completas e os demais sistemas de mercado global.
+
+Save v3 migra versões anteriores, sem criar estatísticas retroativas. A apresentação recebeu melhorias procedurais de estádio/gramado/atletas e opções de qualidade. A publicação do jogo segue aguardando aprovação visual do usuário; a galeria de capturas é independente do site jogável.

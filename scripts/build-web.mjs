@@ -11,7 +11,7 @@ async function copy(directory) {
   }
 }
 for (const d of ['application', 'core', 'data', 'domain']) await copy(d);
-for (const path of ['ui/browser.js', 'ui/field.js', 'ui/field3d.js', 'ui/aim-state.js', 'persistence/save.js']) { const dest = join(target, 'modules', path); await mkdir(dirname(dest), { recursive: true }); await cp(join(root, 'dist', path), dest); }
+for (const path of ['ui/browser.js', 'ui/competitions.js', 'ui/field.js', 'ui/field3d.js', 'ui/stadium3d.js', 'ui/aim-state.js', 'persistence/save.js', 'persistence/world.js', 'persistence/browser-storage.js']) { const dest = join(target, 'modules', path); await mkdir(dirname(dest), { recursive: true }); await cp(join(root, 'dist', path), dest); }
 // A new module directory invalidates the entire import graph on mobile browsers.
 const hash = createHash('sha256');
 async function fingerprint(directory) {
