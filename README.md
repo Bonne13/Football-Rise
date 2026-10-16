@@ -1,59 +1,27 @@
-# Football Rise — identidade por estádio e país, torcida por campanha
+# Football Rise — ligas e divisões UEFA, CONMEBOL e CONCACAF
 
 **Capturas reais da versão em desenvolvimento. O jogo público ainda não foi atualizado.**
 
-O sistema atende todos os **238 clubes do catálogo** — [confira a lista completa de clubes, estádios e países](clubes-estadios.md). Os traçados de ruas/acessos variam por estádio; clubes que dividem o mesmo local mantêm o mesmo cenário. País, cidade, porte e tipologia orientam materiais, telhados, fachadas, vegetação e disposição das construções. Há famílias de objetos reutilizáveis, mas o entorno não repete o mesmo conjunto de quatro ruas. São interpretações aproximadas, sem georreferenciamento das ruas reais.
+O catálogo organiza 106 associações (55 UEFA, 10 CONMEBOL, 41 CONCACAF), com 105 referências de primeira divisão; Liechtenstein não possui liga nacional própria. O pacote ampliado contém **526 clubes e 26 divisões com dados disponíveis em 17 sistemas nacionais**, incluindo divisões inferiores. As demais ligas aguardam participantes/dados; não são todas jogáveis nesta base.
 
-## São Januário — bairro compacto e acesso histórico estilizado
+São referências factuais e edições simuladas, **sem licenciamento comercial oficial**. Os snapshots vão de 2024/25 a 2026/27: dados históricos não confirmam participantes de 2026/27. Novos clubes não recebem elencos reais inventados; parâmetros e uniformes adicionais são procedurais.
 
-![São Januário com malha irregular de bairro compacto](29-sao-januario.png)
+## Segunda divisão separada da primeira
 
-## Vila Belmiro — casas, comércio e torres residenciais
+![Tabela da English Championship e filtro UEFA](40-league-second-division.png)
 
-![Vila Belmiro com blocos residenciais e prédios de diferentes alturas](29-vila-belmiro.png)
+## CONCACAF Champions Cup
 
-## Dean Court — parque, bosque e campo auxiliar
+![Painel da Champions Cup da CONCACAF](41-concacaf.png)
 
-![Dean Court em área verde com acesso lateral e estacionamento](29-dean-court.png)
+## Copa Sudamericana
 
-## Ipurua — vale, terraços, escadas e apartamentos
+![Fase de grupos da Copa Sudamericana](42-sudamericana.png)
 
-![Ipurua com construções elevadas e acesso em desnível](29-ipurua.png)
+## Navegador de celular
 
-## Maracanã — praça, avenidas e corredor de transporte
+![Painel de competições na tela de celular](43-leagues-mobile.png)
 
-![Maracanã com praça de chegada, avenidas e corredor ferroviário estilizado](29-maracana.png)
+Os testes passaram para divisões, filtros, calendário autônomo, salvamento/recarga e controles no computador/celular. Os formatos são compactos; não há reprodução integral de regulamentos nem promoção/rebaixamento completo.
 
-## França — Parc des Princes
-
-![Entorno interpretado com paleta francesa](32-paris.png)
-
-## Alemanha — Allianz Arena
-
-![Arena com entorno de parque e paleta alemã](32-munich.png)
-
-## Itália — Stadio Olimpico
-
-![Estádio em contexto urbano com cores e materiais italianos](32-rome.png)
-
-## Torcida — a mesma arena com campanha boa
-
-A ocupação usa a reputação e os seis últimos resultados do mandante. No início sem resultados, a demanda fica neutra. A base atrai menos público que o profissional.
-
-![Público da arena após sequência simulada de vitórias](35-crowd-winning.png)
-
-## Torcida — a mesma arena com campanha ruim
-
-![Menor ocupação após sequência simulada de derrotas](36-crowd-losing.png)
-
-## Reação ao gol em casa
-
-![Torcida da casa comemora o gol do protagonista](37-crowd-goal.png)
-
-## Reação ao gol do visitante
-
-![Torcida da casa lamenta o gol sofrido quando o protagonista joga fora](38-crowd-away-goal.png)
-
-Nos treinos, as arquibancadas ficam vazias. Os sons são sintetizados e respeitam pausa/silêncio; não usam cantos licenciados.
-
-[Baixar as imagens](previas-identidades-torcida.zip) · [Prévia anterior do entorno](previas-entorno-anterior.md) · [Estádios por clube](previas-estadios.md) · [Treinos e VAR](previas-treinos.md)
+[Baixar estas imagens](previas-ligas.zip) · [Lista das divisões e temporadas disponíveis](ligas-divisoes.md) · [Estádios e torcida](previas-identidades.md) · [Treinos e VAR](previas-treinos.md)
