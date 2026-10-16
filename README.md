@@ -63,12 +63,12 @@ Publique somente `dist-web/`. Os caminhos relativos funcionam no subdiretório `
 
 O início foi inspirado na sequência do Game-teste: **finalização, visão, passe, velocidade, condução e falta**, com três tentativas por fundamento. As regras foram reimplementadas modularmente; o outro repositório não foi modificado.
 
-- **Chute/passe/falta:** segure no campo, puxe na direção oposta à jogada e solte. A linha pontilhada mostra a trajetória; ajuste efeito lateral e elevação nos controles abaixo do campo.
+- **Chute/passe/falta:** toque ou deslize no gol/gramado para escolher o destino. Só depois aparece a bola de controle: escolha o contato, puxe para baixo e solte. Deslizar no campo ajusta a mira e nunca chuta.
 - **Visão:** encontre um companheiro azul livre, observe a linha laranja de impedimento e evite os defensores vermelhos.
 - **Velocidade:** toque no lado esquerdo/direito ou nos botões para trocar de faixa e desviar dos obstáculos.
 - **Condução:** toque no destino para mover jogador e bola, complete os portões em ordem e evite cones.
 
-O tempo começa na primeira ação. Na mira, o relógio pausa enquanto você segura. Use **Próxima tentativa** para salvar o resultado; **Pausar e voltar** permite continuar depois, inclusive após recarregar. Tentativas já confirmadas ficam no navegador; uma tentativa ainda não confirmada recomeça. A exportação do save da carreira não inclui sessões parciais de campo.
+O tempo da tentativa começa quando a jogada é executada; a preparação da mira não consome tempo. Use **Próxima tentativa** para salvar o resultado; **Pausar e voltar** permite continuar depois, inclusive após recarregar. Tentativas já confirmadas ficam no navegador; uma tentativa ainda não confirmada recomeça. A exportação do save da carreira não inclui sessões parciais de campo.
 
 Depois da avaliação, **Praticar no campo** usa três tentativas e aplica desenvolvimento de acordo com a nota (nota zero gasta energia sem melhorar atributos). Na preparação da estreia, **Entrar em campo** oferece passe, finalização, condução e falta; gols e nota de atuação vêm dos resultados, sem formulário manual. Esta é uma partida por oportunidades, ainda sem simulação de 90 minutos ou companheiros controlados por IA. Saves existentes continuam funcionando; jogadores já avaliados podem testar os novos controles pelos treinos e pela próxima partida.
 
@@ -76,10 +76,14 @@ Depois da avaliação, **Praticar no campo** usa três tentativas e aplica desen
 
 O campo usa WebGL/Three.js com câmera por trás do jogador, bola esférica texturizada, jogadores, goleiro, trave/rede, trajetória e rastro em 3D. As geometrias são procedurais; a biblioteca Three.js é distribuída localmente com sua licença MIT, sem depender de CDN.
 
-1. **Toque no gol** para escolher a mira (no gramado em passes).
-2. Na **bola ampliada sobre o campo**, toque no ponto desejado: nas laterais produz efeito; embaixo aumenta a elevação. Um toque simples escolhe o contato e não chuta.
+1. **Toque ou deslize dentro do gol** para escolher a mira (no gramado em passes). O gol fica ampliado e um marcador mostra o destino. Toques fora da rede não iniciam o chute.
+2. **A bola de controle só aparece depois de confirmar a mira.** Nela, toque no ponto desejado: nas laterais produz efeito; embaixo aumenta a elevação. Um toque simples escolhe o contato e não chuta.
 3. **Puxe essa bola para baixo** para carregar a potência e solte. Em 100%, a trajetória alcança a mira selecionada; puxadas menores produzem bolas mais curtas.
 
-O arrasto reverso diretamente no gramado continua disponível. A linha e o marcador 3D mostram o destino antes do chute, e os controles de efeito/elevação também podem ser ajustados pelos seletores. Passes e condução selecionam destinos por raycasting no gramado. A câmera acompanha o jogador na condução.
+Arrastar no campo agora serve somente para ajustar a mira; o chute é executado pela bola de controle. **Alterar mira** oculta a bola e volta ao enquadramento ampliado do gol. A linha e o marcador 3D mostram o destino antes do chute, e os controles de efeito/elevação também podem ser ajustados pelos seletores. Passes e condução selecionam destinos por raycasting no gramado. A câmera acompanha o jogador na condução.
 
-Para celulares sem WebGL, o jogo avisa e abre o campo 2D automaticamente, mantendo os fundamentos por arrasto no campo. O modo gráfico não modifica o formato dos saves ou as regras de resultados.
+Para celulares sem WebGL, o jogo avisa e abre o campo 2D automaticamente, mantendo a seleção da mira e um controle de bola desenhado em 2D. O modo gráfico não modifica o formato dos saves ou as regras de resultados.
+
+### Teste de regressão dos controles
+
+`npm run test:browser` gera o site e abre um servidor temporário para testar toques reais em Chromium: bola oculta antes da mira, rejeição de toques fora do gol, arrasto de mira sem chute, alteração de destino, contato sem disparo, potência e gol, retomada e tela de 320 px. Use Chromium em `/usr/bin/chromium`, informe `CHROMIUM_PATH` ou instale o navegador com `npx playwright install chromium`. Playwright é uma dependência só de desenvolvimento. As capturas ficam em `football-rise-browser/` no diretório temporário do sistema.

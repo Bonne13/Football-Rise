@@ -102,8 +102,16 @@ A estreia é um conjunto limitado de oportunidades controláveis, que pode produ
 
 `src/ui/field3d.ts` traduz as coordenadas de domínio para metros, desenha a cena com Three.js r160 e expõe somente renderização e seleção por raycasting. Campo, gol com rede, personagens, arquibancada e textura da bola são criados por código. A biblioteca em `web/vendor/three.min.js` foi reutilizada do Game-teste (commit de referência acima), sem alterações, com a licença MIT em `web/vendor/THREE-LICENSE.txt`. O pacote `@types/three` é dependência somente de desenvolvimento. O Game-teste não foi alterado.
 
-O contato usa uma segunda cena com esfera e raycasting: lateral vira curva e metade inferior vira elevação. Selecionar contato é separado de finalizar. A força vem da distância de arrasto, enquanto a mira vem da interseção do toque com o plano do gol/gramado. A trajetória e o voo compartilham a interpolação de caminho do domínio. As regras de resultado e as notas continuam em `src/domain/gameplay`/`src/application`. Não se trata de física completa de corpos rígidos.
+O contato, revelado somente após a escolha válida do destino, usa uma segunda cena com esfera e raycasting: lateral vira curva e metade inferior vira elevação. Selecionar contato é separado de finalizar. A força vem da distância de arrasto, enquanto a mira vem da interseção do toque com o plano do gol/gramado. A trajetória e o voo compartilham a interpolação de caminho do domínio. As regras de resultado e as notas continuam em `src/domain/gameplay`/`src/application`. Não se trata de física completa de corpos rígidos.
 
 O adaptador `field.ts` mantém um único ciclo de animação e descarta ambos os renderizadores, geometrias, materiais, texturas, observadores e listeners ao sair. O tamanho do buffer só muda quando o layout muda; a densidade de pixels é limitada a 1,5. As cadeiras usam instanciamento para reduzir chamadas de desenho. Sem WebGL, os canvases são substituídos e o renderer 2D é ativado sem tentar reutilizar um contexto incompatível.
 
 O build inclui a biblioteca e a licença em `dist-web/vendor/`. O grafo de módulos e as URLs dos recursos recebem versão de conteúdo para evitar a mistura de arquivos antigos após uma atualização no Pages.
+
+## Revisão visual e correção da mira
+
+O campo deixou de disparar por distância de arrasto. `src/ui/aim-state.ts` define fases explícitas (`aiming`, `preparing`, `flight`, `resolved`), valida alvos e calcula a potência da puxada. Tocar/deslizar no campo seleciona somente o destino. O controle de bola e a bola física ficam ocultos na fase de mira; um alvo válido revela o controle. Alterar mira volta ao enquadramento ampliado e oculta novamente a bola. A captura de ponteiro e o cancelamento não executam chute. No teclado, espaço confirma primeiro a mira e só um segundo comando finaliza.
+
+A apresentação usa gramado com ruído procedural e filtragem anisotrópica, céu em gradiente, iluminação com sombras limitadas a 1024 px, materiais de maior detalhe, arquibancada coberta, placares de marca própria e uniformes/cabelo/chuteiras procedurais. A câmera amplia o gol durante a seleção; a preparação e o voo usam o enquadramento por trás do jogador. Um marcador HTML de tamanho legível acompanha a projeção 3D. Nenhum asset externo protegido foi adicionado.
+
+`npm run test:browser` mantém uma regressão reproduzível por eventos de toque em tela de celular, além dos testes de validação e potência. O servidor e o navegador do teste são fechados ao terminar. A lógica da carreira e seu formato de save não mudaram nesta revisão.
