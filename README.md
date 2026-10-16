@@ -1,27 +1,35 @@
-# Football Rise — ligas e divisões UEFA, CONMEBOL e CONCACAF
+# Football Rise — nomes reais e regras de referência
 
-**Capturas reais da versão em desenvolvimento. O jogo público ainda não foi atualizado.**
+**Prévia real da versão em desenvolvimento. O jogo público ainda não foi atualizado.**
 
-O catálogo organiza 106 associações (55 UEFA, 10 CONMEBOL, 41 CONCACAF), com 105 referências de primeira divisão; Liechtenstein não possui liga nacional própria. O pacote ampliado contém **526 clubes e 26 divisões com dados disponíveis em 17 sistemas nacionais**, incluindo divisões inferiores. As demais ligas aguardam participantes/dados; não são todas jogáveis nesta base.
+O cadastro reúne as 26 divisões disponíveis com nomes reais, formato de referência, critérios de desempate e indicação do que o motor executa. O catálogo maior mantém 106 associações e o pacote de 526 clubes. Os participantes continuam identificados pelo ano da fonte; dados históricos não foram anunciados como elencos de 2026/27.
 
-São referências factuais e edições simuladas, **sem licenciamento comercial oficial**. Os snapshots vão de 2024/25 a 2026/27: dados históricos não confirmam participantes de 2026/27. Novos clubes não recebem elencos reais inventados; parâmetros e uniformes adicionais são procedurais.
+## EFL Championship: 24 clubes, 46 partidas por clube
 
-## Segunda divisão separada da primeira
+![Nome real, regulamento e classificação da Championship](45-regulamento-championship.png)
 
-![Tabela da English Championship e filtro UEFA](40-league-second-division.png)
+![Tabela da Championship, com calendário completo de 552 jogos](49-tabela-championship.png)
 
-## CONCACAF Champions Cup
+## CONCACAF Champions Cup: ida e volta
 
-![Painel da Champions Cup da CONCACAF](41-concacaf.png)
+![Formato de referência e jogos de ida e volta](46-regulamento-concacaf.png)
 
-## Copa Sudamericana
+## CONMEBOL Sudamericana
 
-![Fase de grupos da Copa Sudamericana](42-sudamericana.png)
+![Regulamento e limites da implementação da Sudamericana](47-regulamento-sudamericana.png)
 
-## Navegador de celular
+## No celular
 
-![Painel de competições na tela de celular](43-leagues-mobile.png)
+![Regras de referência legíveis no celular](48-regulamento-celular.png)
 
-Os testes passaram para divisões, filtros, calendário autônomo, salvamento/recarga e controles no computador/celular. Os formatos são compactos; não há reprodução integral de regulamentos nem promoção/rebaixamento completo.
+## O que já funciona
 
-[Baixar estas imagens](previas-ligas.zip) · [Lista das divisões e temporadas disponíveis](ligas-divisoes.md) · [Estádios e torcida](previas-identidades.md) · [Treinos e VAR](previas-treinos.md)
+Turno e returno em 18 divisões regulares; divisões finais de Escócia e Áustria com transporte dos pontos; eliminatórias continentais com agregado e finais próprias; fase UEFA com mandos equilibrados; grupos de cinco na América Central e Caribe. Saves anteriores mantêm seu calendário. Testes de regras, build e teste no navegador passaram.
+
+## O que ainda falta
+
+MLS, Argentina, Colômbia, México, Bélgica e Grécia têm o formato histórico descrito, mas a execução continua simplificada. Acesso/descenso, vagas, preliminares, prorrogação e critérios finais específicos ainda não estão completos. Estaduais e copas nacionais continuam compactos. A repescagem da Sudamericana com a Libertadores e a revisão da Leagues Cup permanecem pendentes.
+
+A rede bloqueou consultas aos sites oficiais com HTTP 403; **não há confirmação integral dos regulamentos de 2026/27**. Links dos organizadores constam na tela para conferência.
+
+[Baixar estas cinco imagens](previas-regulamentos.zip) · [Detalhes da implementação e limites](regulamentos-cobertura.md) · [Prévia anterior do catálogo](previas-ligas-catalogo.md) · [Estádios e torcida](previas-identidades.md) · [Treinos e VAR](previas-treinos.md)
