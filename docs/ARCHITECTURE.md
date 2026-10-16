@@ -273,3 +273,6 @@ A apresentação recebe o perfil e as cores do mandante, inclusive quando o prot
 ### Regulamentos de competições
 
 As novas edições podem persistir `Tournament.regulationId`, um ID de regras imutáveis. O campo é opcional: saves anteriores sem ID preservam o comportamento compacto e seu calendário. O catálogo em `src/data/competition-regulations.ts` distingue formatos executados e referências ainda não implementadas; a interface apresenta essa cobertura. Ida/volta é identificada por competição, fase, rodada e adversários invertidos; o domínio decide pelo agregado e a persistência valida o desempate. Mudanças futuras de regras precisam de novos IDs, sem reinterpretar resultados salvos. Limites e fontes estão em `docs/data/COMPETITION-REGULATIONS.md`.
+
+
+Os seis formatos especiais usam IDs `rules-v2:*` e um controlador próprio (`special-formats.ts`) para calendário, classificação, critérios de decisão e transições. Não há regras de qualificação na UI. Os formatos v1 permanecem imutáveis para saves antigos. Apertura/Clausura/Finalización são competições independentes; fases e vencedores são derivados dos jogos persistidos, sem um estado paralelo que possa divergir do save. Melhor de três só agenda o terceiro jogo se necessário. O importador local de confrontos exige a revisão CC0 fixada e valida a distribuição de confrontos por zona/conferência.

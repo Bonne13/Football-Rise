@@ -14,7 +14,8 @@
     "test:var": "npm run build:web && node scripts/test-var.cjs",
     "test:stadiums": "npm run build:web && node scripts/test-stadiums.cjs",
     "test:crowd": "npm run build:web && node scripts/test-crowd.cjs",
-    "test:leagues": "npm run build:web && node scripts/test-leagues.cjs"
+    "test:leagues": "npm run build:web && node scripts/test-leagues.cjs",
+    "test:special-leagues": "npm run build:web && node scripts/test-special-leagues.cjs"
   },
   "devDependencies": {
     "@types/node": "24.19.2",

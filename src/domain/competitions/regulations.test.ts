@@ -2,16 +2,16 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createCareer } from '../../application/career.js';
 import { serializeSave, deserializeSave } from '../../persistence/save.js';
-import { REGULATIONS } from '../../data/competition-regulations.js';
+import { REGULATIONS, regulationById } from '../../data/competition-regulations.js';
 import { advanceWorld, standings, aggregate, tieMatches, type Tournament } from './world.js';
 import type { Club } from '../career/state.js';
 const club=(id:string,country:string):Club=>({id,name:id,country,reputation:60,facilities:60,coach:60,squadOverall:60,minimumOverall:25,minimumPotential:40,needs:['ST'],youthPlaces:5,seniorPlaces:5,wageBudget:5000,maxWeeklyWage:300});
 const career=(country:string,count:number)=>createCareer({name:'Rules',nationality:country,position:'ST',preferredFoot:'right',seed:42},{loadYouthClubs:()=>Array.from({length:count},(_,i)=>club(`c${i}`,country))});
 const tournament=(s:ReturnType<typeof career>,key:string):Tournament=>s.world.tournaments.find(t=>t.key===key)!;
-test('reference registry covers all 26 available divisions with stable names and explicit unsupported formats',()=>{
+test('reference registry covers all 26 available divisions with stable names and versioned special formats',()=>{
  assert.equal(REGULATIONS.length,26);assert.equal(new Set(REGULATIONS.map(r=>r.id)).size,26);
- assert.equal(REGULATIONS.find(r=>r.key==='league:Estados Unidos')!.engine,'reference-only');
- const s=career('México',18);assert.equal(s.world.tournaments.some(t=>t.key==='cup:México'),false);assert.match(tournament(s,'league:México').notice,/ainda simplificada/);
+ assert.equal(REGULATIONS.find(r=>r.key==='league:Estados Unidos')!.engine,'mls-playoffs');assert.equal(regulationById('rules-v1:league:Estados Unidos')!.engine,'reference-only');
+ const s=career('México',18);assert.equal(s.world.tournaments.some(t=>t.key==='cup:México'),false);assert.match(tournament(s,'league:México').notice,/Formato esportivo executado/);assert.ok(tournament(s,'league-clausura:México'));
 });
 test('Premier League schedule has 380 matches, 19 at home and away, every opponent twice',()=>{
  const s=career('Inglaterra',20),t=tournament(s,'league:Inglaterra'),fixtures=s.world.fixtures.filter(f=>f.competitionId===t.id);

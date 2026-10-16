@@ -1,4 +1,5 @@
-import { regulationById } from '../data/competition-regulations.js';
+import { allowedSpecialStages, specialOutcome, specialLegs, SPECIAL_STAGES, SPECIAL_KNOCKOUT_STAGES } from '../domain/competitions/special-formats.js';
+import { regulationMatchesKey, isSpecialRegulation } from '../data/competition-regulations.js';
 import { aggregate, tieMatches, type Tournament, type Fixture } from '../domain/competitions/world.js';
 import type { CompetitionWorld } from '../domain/competitions/world.js';
 import { requireRule } from '../core/rules.js';
@@ -16,7 +17,7 @@ export function validateWorld(value: unknown): asserts value is CompetitionWorld
   for (const t of value.teams) { requireRule(object(t) && fields(t, ['id', 'name', 'country', 'strength', 'national']) && text(t.id) && text(t.name) && text(t.country) && number(t.strength, 1, 100) && typeof t.national === 'boolean' && !teams.has(String(t.id)), 'Equipe inválida ou duplicada.'); teams.add(String(t.id)); }
   for (const t of value.tournaments) {
     requireRule(object(t) && fields(t, [...(Object.hasOwn(t,'regulationId')?['regulationId']:[]), 'id', 'key', 'name', 'season', 'level', 'format', 'phase', 'participants', 'groups', 'waiting', 'champion', 'notice']) && text(t.id) && text(t.key) && text(t.name) && t.season === value.season && text(t.notice) && ['youth', 'senior', 'national'].includes(String(t.level)) && ['league', 'cup', 'league-knockout', 'groups'].includes(String(t.format)) && ['league', 'groups', 'playoff', 'knockout', 'complete', 'unavailable'].includes(String(t.phase)), 'Competição inválida.');
-    if(Object.hasOwn(t,'regulationId')) requireRule(typeof t.regulationId==='string' && (regulationById(t.regulationId)?.key===t.key || (['champions','europa','conference','libertadores','sudamericana','concacaf-champions','central-american','caribbean','world-cup'].includes(String(t.key)) && t.regulationId===`continental-v1:${t.key}`)), 'Regulamento desconhecido.');
+    if(Object.hasOwn(t,'regulationId')) requireRule(typeof t.regulationId==='string' && (regulationMatchesKey(t.regulationId,String(t.key)) || (['champions','europa','conference','libertadores','sudamericana','concacaf-champions','central-american','caribbean','world-cup'].includes(String(t.key)) && t.regulationId===`continental-v1:${t.key}`)), 'Regulamento desconhecido.');
     requireRule(list(t.participants, 10000) && t.participants.every(id => typeof id === 'string' && teams.has(id)) && new Set(t.participants).size === t.participants.length, 'Participantes inválidos.');
     const participants = new Set(t.participants as string[]);
     requireRule(list(t.waiting, 10000) && t.waiting.every(id => participants.has(String(id))) && new Set(t.waiting).size === t.waiting.length && list(t.groups, 1000) && t.groups.every(g => Array.isArray(g) && g.every(id => participants.has(String(id)))) && (t.champion === null || participants.has(String(t.champion))) && (t.phase === 'complete' ? t.champion !== null : t.champion === null), 'Classificação inconsistente.');
@@ -24,7 +25,7 @@ export function validateWorld(value: unknown): asserts value is CompetitionWorld
     requireRule(!tournaments.has(String(t.id)), 'Competição duplicada.'); tournaments.set(String(t.id), { level: String(t.level), participants, phase: String(t.phase) });
   }
   for (const f of value.fixtures) {
-    requireRule(object(f) && fields(f, ['id', 'competitionId', 'round', 'stage', 'group', 'date', 'home', 'away', 'homeGoals', 'awayGoals', 'penalties']) && text(f.id) && !fixtures.has(String(f.id)) && tournaments.has(String(f.competitionId)) && number(f.round, 1, 1000) && ['league', 'groups', 'knockout', 'playoff'].includes(String(f.stage)) && number(f.group, -1, 1000) && date(f.date), 'Partida inválida.');
+    requireRule(object(f) && fields(f, ['id', 'competitionId', 'round', 'stage', 'group', 'date', 'home', 'away', 'homeGoals', 'awayGoals', 'penalties']) && text(f.id) && !fixtures.has(String(f.id)) && tournaments.has(String(f.competitionId)) && number(f.round, 1, 1000) && (SPECIAL_STAGES.includes(String(f.stage))) && number(f.group, -1, 1000) && date(f.date), 'Partida inválida.');
     const t = tournaments.get(String(f.competitionId))!;
     const full = (value.tournaments as unknown as { id: string; groups: string[][] }[]).find(c => c.id === f.competitionId)!;
     requireRule(f.stage === 'groups' ? Number(f.group) >= 0 && !!full.groups[Number(f.group)]?.includes(String(f.home)) && !!full.groups[Number(f.group)]?.includes(String(f.away)) : f.group === -1, 'Grupo da partida inconsistente.');
@@ -32,17 +33,19 @@ export function validateWorld(value: unknown): asserts value is CompetitionWorld
     const pending = f.homeGoals === null && f.awayGoals === null;
     requireRule(pending || (number(f.homeGoals, 0, 100) && number(f.awayGoals, 0, 100)), 'Placar inválido.');
     const pens = f.penalties;
-    const knockout = ['knockout', 'playoff'].includes(String(f.stage));
+    const knockout = SPECIAL_KNOCKOUT_STAGES.includes(String(f.stage));
     const competition=(value.tournaments as unknown as Tournament[]).find(c=>c.id===f.competitionId)!;
+    requireRule((isSpecialRegulation(competition)?allowedSpecialStages(competition):['league','groups','knockout','playoff']).includes(String(f.stage)), 'Fase incompatível com o regulamento.');
     const revised=competition.regulationId?.startsWith('continental-v1:');
+    const special=specialOutcome(value as unknown as CompetitionWorld,competition,f as unknown as Fixture);
     const fw=value as unknown as CompetitionWorld, match=f as unknown as Fixture;
-    const legs=revised?tieMatches(fw,match):[match];
+    const legs=special?specialLegs(fw,competition,match):revised?tieMatches(fw,match):[match];
     requireRule(legs.length<=2 && (legs.length!==2 || (legs[0]!.home===legs[1]!.away && legs[0]!.away===legs[1]!.home)), 'Confronto de ida e volta inválido.');
     requireRule(legs.length!==2 || legs[1]!.homeGoals===null || legs[0]!.homeGoals!==null, 'Volta disputada antes da ida.');
     const last=legs.at(-1)!.id===f.id, settled=legs.every(l=>l.homeGoals!==null);
-    const [h,a]=revised?aggregate(fw,match):[f.homeGoals,f.awayGoals];
-    requireRule(pens === null || (!pending && knockout && last && settled && h===a && Array.isArray(pens) && pens.length===2 && number(pens[0],0,100) && number(pens[1],0,100) && pens[0]!==pens[1]), 'Pênaltis inválidos.');
-    requireRule(pending || !knockout || !last || !settled || h!==a || pens!==null, 'Mata-mata empatado sem desempate.');
+    const [h,a]=special?(special.tied?[0,0]:[1,0]):revised?aggregate(fw,match):[f.homeGoals,f.awayGoals];
+    requireRule(pens === null || (!pending && knockout && last && settled && h===a && (!special||special.penalties) && Array.isArray(pens) && pens.length===2 && number(pens[0],0,100) && number(pens[1],0,100) && pens[0]!==pens[1]), 'Pênaltis inválidos.');
+    requireRule(pending || !knockout || !last || !settled || h!==a || !!special&&!special.penalties || pens!==null, 'Mata-mata empatado sem desempate.');
     if (pending) requireRule(pens === null, 'Partida pendente com pênaltis.');
     for (const team of [f.home, f.away]) { const key = `${t.level}:${team}:${f.date}`; requireRule(!occupied.has(key), 'Equipe com duas partidas na mesma data.'); occupied.add(key); }
     fixtures.add(String(f.id));

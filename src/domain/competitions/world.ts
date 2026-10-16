@@ -1,3 +1,4 @@
+import { initializeSpecial, progressSpecial, specialStandings, specialOutcome } from './special-formats.js';
 import { regulationFor, regulationById, REAL_CUP_NAMES } from '../../data/competition-regulations.js';
 import { ASSOCIATIONS, associationFor } from '../../data/associations.js';
 import { LEAGUE_SNAPSHOTS, membershipFor } from '../../data/league-snapshots.js';
@@ -18,6 +19,7 @@ const startDate = (year: number, month: number, day: number) => `${year + (month
 const seasonOn = (date: string) => Number(date.slice(0, 4)) - (date.slice(5, 7) < '07' ? 1 : 0);
 const sortedTeams = (clubs: readonly Club[]) => [...clubs].sort((a, b) => b.squadOverall - a.squadOverall || compare(a.id, b.id));
 export function standings(w: CompetitionWorld, t: Tournament, group?: number): Standing[] {
+  const specialized=specialStandings(w,t,group);if(specialized)return specialized;
   const rows = new Map((group === undefined ? t.participants : t.groups[group] ?? []).map(teamId => [teamId, { teamId, played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, points: 0 }]));
   const rule = regulationById(t.regulationId), split = rule && ['scottish-split','austrian-split'].includes(rule.engine);
   let carried = false;
@@ -109,7 +111,9 @@ function addTournament(w: CompetitionWorld, key: string, name: string, ids: stri
   if(['champions','europa','conference','libertadores','sudamericana','concacaf-champions','central-american','caribbean','world-cup'].includes(key)) {
     t.regulationId=`continental-v1:${key}`; t.notice='Formato principal de referência aplicado. Participantes, sorteio, vagas e datas simulados; fases preliminares e critérios finais não reproduzidos integralmente.';
   }
-  w.tournaments.push(t); if (ids.length < 2) { t.notice = 'Clubes/seleções insuficientes no pacote para realizar esta edição.'; return; }
+  w.tournaments.push(t);
+  if(initializeSpecial(w,t,date,(home,away,when,round,stage,group)=>fixture(w,t,home,away,when,round,stage,group)))return;
+  if (ids.length < 2) { t.notice = 'Clubes/seleções insuficientes no pacote para realizar esta edição.'; return; }
   if (t.phase === 'league') roundRobin(w,t,ids,date,'league',rounds,-1,rule?.engine==='scottish-split'?3:!!rule && ['double-round-robin','austrian-split'].includes(rule.engine));
   else if (t.phase === 'groups') {
     // Seeded pots distribute the strongest teams across groups instead of stacking them together.
@@ -130,6 +134,13 @@ export function createWorld(clubs: readonly Club[], seed: number, date: string, 
     const domesticKey = `league:${country}`;
     const ids = ranked.filter(c => (membershipFor(c)?.key ?? `league:${c.country}`) === domesticKey).map(c => c.id);
     if (!association || association.leagueName) addTournament(w, domesticKey, association?.leagueName ?? `Liga nacional · ${country}`, ids, 'league', 'senior', startDate(season, 8, 8));
+    const domesticRule=regulationFor(domesticKey);
+    if(domesticRule && ['argentine-cups','colombian-cups','mexican-liguilla'].includes(domesticRule.engine)){
+      const first=w.tournaments.find(t=>t.key===domesticKey)!;first.name+=' · Apertura';
+      const secondKey=`league-clausura:${country}`;
+      addTournament(w,secondKey,domesticRule.name,ids,'league','senior',startDate(season,1,8));
+      w.tournaments.find(t=>t.key===secondKey)!.name+=country==='Colômbia'?' · Finalización':' · Clausura';
+    }
     const national = ranked.filter(c => c.country === country).map(c => c.id);
     if (national.length) addTournament(w, `youth:${country}`, `Liga da base · ${country}`, national, 'league', 'youth', addDays(`${season}-07-01`, 7), Math.min(18, national.length - 1));
     const cupIds = ranked.filter(c => (membershipFor(c)?.leagueCountry === 'Inglaterra' ? 'Inglaterra' : c.country) === country).map(c => c.id);
@@ -219,6 +230,8 @@ function awardTournament(w: CompetitionWorld, t: Tournament) {
   }
 }
 function progress(w: CompetitionWorld, t: Tournament) {
+  const before=t.phase;
+  if(progressSpecial(w,t,(home,away,date,round,stage,group)=>fixture(w,t,home,away,date,round,stage,group))){if(before!=='complete'&&t.phase==='complete')awardTournament(w,t);return;}
   const all = w.fixtures.filter(f => f.competitionId === t.id);
   const current = all.filter(f => f.stage === t.phase && (t.phase === 'knockout' ? f.round === Math.max(...all.map(f => f.round)) : true));
   if (!current.length || current.some(f => f.homeGoals === null)) return;
@@ -273,12 +286,14 @@ export function advanceWorld(s: CareerState, through: string, played?: { fixture
     const f = pending[cursor++]; if (!f) break;
     const t = w.tournaments.find(t => t.id === f.competitionId)!;
     const home = teamsIndex.get(f.home)!, away = teamsIndex.get(f.away)!;
-    f.homeGoals = Math.max(0, Math.min(5, random(0, 3) + Math.round((home.strength - away.strength + 4) / 25)));
+    f.homeGoals = Math.max(0, Math.min(5, random(0, 3) + Math.round((home.strength - away.strength + (t.regulationId==='rules-v2:league:Argentina'&&f.stage==='final'?0:4)) / 25)));
     f.awayGoals = Math.max(0, Math.min(5, random(0, 3) + Math.round((away.strength - home.strength) / 25)));
     const controlled = played && played.fixtureId === f.id ? played : null;
     const playerTeam = t.level === 'national' ? `nation:${s.player.nationality}` : s.contract?.clubId;
     if (controlled) { requireRule(playerTeam === f.home || playerTeam === f.away, 'Atleta fora desta partida.'); if (playerTeam === f.home) f.homeGoals += controlled!.performance.goals + controlled!.performance.assists; else f.awayGoals += controlled!.performance.goals + controlled!.performance.assists; }
-    if (['knockout','playoff'].includes(f.stage)) {
+    const special=specialOutcome(w,t,f);
+    if(special?.penalties)f.penalties=random(0,1)?[5,4]:[4,5];
+    else if (!special && ['knockout','playoff'].includes(f.stage)) {
       const legs=t.regulationId?.startsWith('continental-v1:')?tieMatches(w,f):[f];
       const [h,a]=t.regulationId?.startsWith('continental-v1:')?aggregate(w,f):[f.homeGoals,f.awayGoals];
       if(legs.at(-1)!.id===f.id && h===a)f.penalties=random(0,1)?[5,4]:[4,5];

@@ -3,7 +3,7 @@
 export interface Regulation {
   id: string; key: string; name: string; reference: string; source: string;
   format: string; tiebreak: string; movement: string;
-  engine: 'double-round-robin' | 'scottish-split' | 'austrian-split' | 'continental' | 'reference-only';
+  engine: 'double-round-robin' | 'scottish-split' | 'austrian-split' | 'continental' | 'reference-only' | 'belgian-split' | 'greek-split' | 'argentine-cups' | 'colombian-cups' | 'mexican-liguilla' | 'mls-playoffs';
   expected: number; ranking: 'goals' | 'wins' | 'head-to-head';
 }
 const league = (key: string, name: string, expected: number, source: string, ranking: Regulation['ranking'] = 'goals', movement = 'Acesso, descenso e vagas continentais ainda não são executados pelo motor.'): Regulation => ({ id:`rules-v1:${key}`,key,name,expected,source,ranking,reference:'Formato de referência; edição 2026/27 não conferida online',format:`${expected} clubes; turno e returno; ${(expected-1)*2} partidas por clube. Vitória 3 pontos; empate 1.`,tiebreak:ranking==='wins'?'Pontos, vitórias, saldo de gols e gols marcados; confronto direto para dois empatados. Disciplina/sorteio não modelados.':ranking==='head-to-head'?'Pontos; minitabela de confrontos diretos entre os empatados; saldo e gols gerais. Critérios finais específicos dependem da edição.':'Pontos, saldo de gols e gols marcados. Critérios finais específicos dependem da edição.',movement,engine:'double-round-robin' });
@@ -38,9 +38,23 @@ refs.push(
  special('league:México','Liga MX',18,'https://ligamx.net/','Referência 2024/25: Apertura e Clausura; 17 rodadas cada, play-in e liguilla com ida e volta. Critérios de desempate diferem por fase.'),
  special('league:Estados Unidos','Major League Soccer',30,'https://www.mlssoccer.com/','Referência 2025: duas conferências; 34 jogos por clube, calendário não simétrico, wild cards, primeira rodada melhor de três e demais fases eliminatórias.')
 );
-export const REGULATIONS: readonly Regulation[] = refs;
-export const regulationFor = (key:string) => REGULATIONS.find(r=>r.key===key);
-export const regulationById = (id:string|undefined) => REGULATIONS.find(r=>r.id===id);
+const legacy: readonly Regulation[] = [...refs];
+const engines: Record<string,Regulation['engine']> = {'league:Bélgica':'belgian-split','league:Grécia':'greek-split','league:Argentina':'argentine-cups','league:Colômbia':'colombian-cups','league:México':'mexican-liguilla','league:Estados Unidos':'mls-playoffs'};
+const specialFormats:Record<string,string>={
+ 'league:Bélgica':'Referência 2025/26: 30 rodadas; grupos de título (6), Europa (6) e permanência (4). Mais dez jogos nos grupos de seis e seis no grupo de quatro. Pontos dos dois primeiros grupos divididos por dois, arredondados para cima; permanência mantém pontos.',
+ 'league:Grécia':'Referência 2025/26: 26 rodadas; grupos 1–4, 5–8 e 9–14 em turno e returno. Grupos de título e permanência mantêm pontos; grupo 5–8 recebe metade, arredondada para cima.',
+ 'league:Argentina':'Referência 2025: Apertura e Clausura independentes; duas zonas de 15, 16 jogos por clube incluindo dois interzonais; oito primeiros por zona; oitavas, quartas e semifinais em jogo único e final neutra.',
+ 'league:Colômbia':'Referência 2025: Apertura e Finalización independentes; 20 jogos na fase regular, incluindo rodada regional; oito classificados, dois quadrangulares de quatro em ida e volta; final em dois jogos.',
+ 'league:México':'Referência 2024/25: Apertura e Clausura independentes; 17 rodadas; 1º–6º nas quartas, 7º–10º no play-in (7×8, 9×10 e repescagem). Quartas, semifinais e final em ida e volta; chave resemeada pela fase regular.',
+ 'league:Estados Unidos':'Referência 2025: duas conferências de 15; 34 jogos (28 na conferência e seis cruzados). Sete classificados diretos e wild card entre 8º e 9º por conferência; primeira rodada melhor de três, demais fases em jogo único.'
+};
+export const REGULATIONS: readonly Regulation[] = refs.map(r=>engines[r.key]?{...r,id:`rules-v2:${r.key}`,engine:engines[r.key]!,format:specialFormats[r.key]!,reference:r.key==='league:México'?'Referência 2024/25 do catálogo': ['league:Bélgica','league:Grécia'].includes(r.key)?'Referência 2025/26 do catálogo':'Referência 2025 do catálogo',tiebreak:r.key==='league:Estados Unidos'?'Pontos, vitórias, saldo e gols; playoffs decididos por vitórias. Disciplina/sorteio final ainda não modelados.':r.key==='league:México'?'Play-in por pênaltis; quartas e semifinais pelo agregado e posição na fase regular; final empatada no agregado por pênaltis.':r.key==='league:Colômbia'?'Pontos, saldo e gols; cabeças de chave dos quadrangulares têm vantagem no empate em pontos.':r.tiebreak}:r);
+export const regulationFor = (key:string) => REGULATIONS.find(r=>r.key===key.replace('league-clausura:','league:'));
+export const regulationById = (id:string|undefined) => [...REGULATIONS,...legacy].find(r=>r.id===id);
+export const isSpecialRegulation = (t:{regulationId?:string}) => t.regulationId?.startsWith('rules-v2:')===true;
+export const regulationMatchesKey = (id:string,key:string) => {
+ const r=regulationById(id);return !!r && (r.key===key || id.startsWith('rules-v2:') && ['argentine-cups','colombian-cups','mexican-liguilla'].includes(r.engine) && r.key===key.replace('league-clausura:','league:'));
+};
 export const REAL_CUP_NAMES: Readonly<Record<string,string>> = {
  Brasil:'Copa do Brasil',Inglaterra:'FA Cup',Espanha:'Copa del Rey',Itália:'Coppa Italia',Alemanha:'DFB-Pokal',França:'Coupe de France',Portugal:'Taça de Portugal',Canadá:'Canadian Championship','Estados Unidos':'U.S. Open Cup',Argentina:'Copa Argentina',Áustria:'ÖFB-Cup',Bélgica:'Belgian Cup',Colômbia:'Copa Colombia',Escócia:'Scottish Cup',Grécia:'Greek Cup',Turquia:'Türkiye Kupası','Países Baixos':'KNVB Beker','País de Gales':'Welsh Cup',Liechtenstein:'Liechtenstein Cup'
 };
