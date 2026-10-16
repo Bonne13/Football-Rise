@@ -39,6 +39,17 @@ const server = createServer(async (req, res) => {
       const ball = await page.locator('#contact-ball').boundingBox(); await page.mouse.click(ball.x+ball.width/2,ball.y+ball.height/2); await page.clock.runFor(1400);
     }
     async function seek(value) { await page.locator('#var-progress').evaluate((el,value)=>{el.value=String(value);el.dispatchEvent(new Event('input',{bubbles:true}));},value); }
+    const textureCheck = await page.evaluate(async () => {
+      const url = document.querySelector('script[type=module]').src;
+      const {paintPixelPlayers} = await import(url.replace('ui/browser.js','ui/pixel-player.js'));
+      const {OFFICIAL_KITS} = await import(url.replace('ui/browser.js','data/official-kits.js'));
+      const pixels = (kit,number,role) => {const c=document.createElement('canvas');paintPixelPlayers(c,kit,number,false,0,role);return c.getContext('2d').getImageData(0,0,c.width,c.height).data;};
+      return Object.entries(OFFICIAL_KITS).map(([color,kit])=>{
+        const a=pixels(kit,7,'official'),b=pixels(kit,99,'official'),p=pixels(kit,7,'player'),q=pixels(kit,99,'player');
+        return {color,officialIndependent:a.every((v,i)=>v===b[i]),playersNumbered:p.some((v,i)=>v!==q[i])};
+      });
+    });
+    for(const result of textureCheck){assert.equal(result.officialIndependent,true);assert.equal(result.playersNumbered,true);}
     await setup('vision'); await kick(18.46,90.55);
     assert.match(await page.locator('#field-feedback').innerText(),/Impedimento/);
     const time = await page.locator('#field-clock').innerText();
@@ -53,6 +64,12 @@ const server = createServer(async (req, res) => {
     await seek(12); await page.screenshot({path:join(screenshots,'19-pitchside-monitor.png')});
     await seek(15); assert.match(await page.locator('#var-title').innerText(),/IMPEDIMENTO CONFIRMADO/);
     await page.screenshot({path:join(screenshots,'20-var-verdict.png')});
+    for (const [color,file] of [['black','22-official-black.png'],['yellow','23-official-yellow.png'],['red','24-official-red.png']]) {
+      await page.locator('#var-close').click();await page.locator('#field-pause').click();await page.locator('#officials-kit').selectOption(color);
+      assert.equal(await page.evaluate(()=>localStorage.getItem('football-rise.officials-kit')),color);
+      await page.locator('#field-var').click();await page.locator('#var-pause').click();await seek(15);
+      await page.screenshot({path:join(screenshots,file)});
+    }
     assert.equal(await page.locator('#field-clock').innerText(),time); assert.equal(await page.evaluate(()=>window.varProgressCalls),0);
     await page.setViewportSize({width:390,height:844}); await seek(2.5);
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
@@ -67,6 +84,6 @@ const server = createServer(async (req, res) => {
     await page.locator('#var-close').click(); await page.clock.runFor(100);
     assert.equal(await page.locator('#var-overlay').isVisible(),false); assert.equal(await page.evaluate(()=>window.varProgressCalls),0);
     assert.deepEqual(errors,[]);
-    console.log('VAR passed: actual offside, assistant, three-person room, walk/monitor, verdict, frozen clock, mobile layout, skip, single result recording and automatic match-goal review.');
+    console.log('Officials and VAR passed: number-free officials in all poses, black/yellow/red kits, retained player numbers, actual offside, assistant, three-person room, walk/monitor, verdict, frozen clock, mobile layout, skip, single result recording and automatic match-goal review.');
   } finally { await browser?.close(); await new Promise(r=>server.close(r)); }
 })().catch(e=>{console.error(e);process.exitCode=1});

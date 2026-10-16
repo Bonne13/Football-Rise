@@ -19,19 +19,25 @@ export class VARroom {
     c.fillStyle = '#243c4d'; c.fillRect(45, 412, 910, 105); c.fillStyle = '#5c7784'; c.fillRect(45, 411, 910, 6);
     for (let i = 0; i < 3; i++) {
       const x = 180 + i * 315;
-      c.fillStyle = '#0a111c'; c.fillRect(x - 36, 472, 75, 88); c.fillRect(x - 28, 455, 60, 85);
+      // Side-visible office chair and bent trouser legs make the seated posture explicit.
       c.fillStyle = '#071018'; c.fillRect(x - 46, 421, 95, 19);
       for (let k = 0; k < 12; k++) { c.fillStyle = k === Math.floor(time * 2 + i) % 12 ? '#78e3bf' : '#35556b'; c.fillRect(x - 40 + k * 7, 426, 4, 5); }
-      // Seated staff are office operators, not football sprites in numbered jerseys.
-      c.fillStyle = '#1d5060'; c.fillRect(x - 30, 417, 60, 70); c.fillRect(x - 36, 424, 72, 30);
-      c.fillStyle = ['#bc865f', '#d3a17d', '#925f45'][i]!; c.fillRect(x - 17, 378, 34, 37); c.fillRect(x - 7, 410, 14, 10);
-      c.fillRect(x - 40, 437, 9, 18); c.fillRect(x + 31, 437, 9, 18);
-      c.fillStyle = ['#252b2d', '#40312b', '#22292b'][i]!; c.fillRect(x - 17, 376, 34, 25); c.fillRect(x - 13, 372, 26, 8);
-      c.fillStyle = '#4a8a95'; c.fillRect(x - 28, 420, 4, 43); c.fillRect(x + 24, 420, 4, 43);
-      c.fillStyle = '#c7e9e4'; c.font = 'bold 11px monospace'; c.textAlign = 'center'; c.fillText(['VAR', 'AVAR', 'REPLAY'][i]!, x, 445); c.textAlign = 'left';
-      c.strokeStyle = '#a6c1cb'; c.lineWidth = 5; c.beginPath(); c.arc(x, 394, 22, Math.PI, 0); c.stroke();
-      c.fillStyle = '#a3beca'; c.fillRect(x - 25, 394, 6, 15); c.fillRect(x + 19, 394, 6, 15); c.fillRect(x + 22, 408, 16, 3);
-      c.fillStyle = '#0b1721'; c.fillRect(x - 34, 472, 68, 60); c.fillRect(x - 4, 532, 8, 15); c.fillRect(x - 39, 544, 78, 5);
+      c.fillStyle = '#08131d'; c.fillRect(x - 37, 438, 13, 68); c.fillRect(x - 30, 500, 79, 13);
+      c.fillStyle = '#456372'; c.fillRect(x - 35, 442, 4, 58); c.fillRect(x - 1, 513, 8, 28);
+      c.fillStyle = '#0a121a'; c.fillRect(x - 35, 539, 78, 5);
+      for (const dx of [-35, 35]) c.fillRect(x + dx, 540, 9, 8);
+      c.fillStyle = '#172a3a'; c.fillRect(x - 15, 486, 50, 16); c.fillRect(x + 24, 499, 13, 31);
+      c.fillStyle = '#263e50'; c.fillRect(x - 8, 492, 57, 15); c.fillRect(x + 36, 503, 13, 33);
+      c.fillStyle = '#09131c'; c.fillRect(x + 22, 527, 23, 8); c.fillRect(x + 34, 533, 26, 9);
+      c.fillStyle = '#1d5060'; c.fillRect(x - 22, 423, 48, 68); c.fillRect(x - 27, 426, 58, 18);
+      const skin = ['#bc865f', '#d3a17d', '#925f45'][i]!;
+      c.fillStyle = skin; c.fillRect(x - 14, 385, 32, 34); c.fillRect(x - 4, 416, 12, 10);
+      c.fillStyle = ['#252b2d', '#40312b', '#22292b'][i]!; c.fillRect(x - 14, 383, 32, 22); c.fillRect(x - 10, 379, 24, 7);
+      // Elbows bend toward the console rather than hanging beside a standing figure.
+      c.fillStyle = '#286373'; c.fillRect(x - 26, 434, 10, 25); c.fillRect(x + 23, 432, 10, 24);
+      c.fillStyle = skin; c.fillRect(x - 23, 453, 33, 8); c.fillRect(x + 28, 448, 24, 8); c.fillRect(x + 44, 435, 8, 17);
+      c.strokeStyle = '#a6c1cb'; c.lineWidth = 5; c.beginPath(); c.arc(x + 2, 401, 22, Math.PI, 0); c.stroke();
+      c.fillStyle = '#a3beca'; c.fillRect(x - 23, 400, 6, 14); c.fillRect(x + 21, 400, 6, 14); c.fillRect(x + 24, 413, 15, 3);
     }
     c.fillStyle = '#07131e'; c.fillRect(0, 553, 1000, 47); c.font = 'bold 18px monospace'; c.fillStyle = final ? '#b4f58d' : '#f3d47d';
     c.fillText(final ? reviewVerdict(incident) : 'ANÁLISE EM ANDAMENTO · DADOS DO LANCE', 40, 581);

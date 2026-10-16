@@ -1,5 +1,6 @@
 import { stadiumFor, type StadiumProfile } from '../data/stadiums.js';
 import { paintPixelPlayers, spriteFrame, spriteFacing, SPRITE_SIZE, playerAnimationFrame, type PlayerAnimation } from './pixel-player.js';
+import { OFFICIAL_KITS, officialsColor, type OfficialsChoice } from '../data/official-kits.js';
 import { buildReviewMonitor } from './var3d.js';
 import type { ReviewIncident, ReviewPhase } from '../domain/match/video-review.js';
 import { buildStadium } from './stadium3d.js';
@@ -22,6 +23,8 @@ export interface FieldAppearance { number: number; training: boolean; kit: Kit; 
 export const fieldZone = trialZone;
 export class Field3D {
   private renderKey = '';
+  private officialsChoice: OfficialsChoice = 'auto';
+  setOfficialsKit(choice: OfficialsChoice) { this.officialsChoice = choice; this.renderKey = ''; }
   private varView: { phase: ReviewPhase; progress: number } | null = null;
   private reviewMonitor!: ReturnType<typeof buildReviewMonitor>;
   setVARIncident(incident: ReviewIncident) { this.reviewMonitor.setIncident(incident); this.renderKey = ''; }
@@ -168,14 +171,16 @@ export class Field3D {
   private zoneOffset = 0;
   private vector(p: Point, goal = false) { const v = worldPoint(p, goal); return new THREE.Vector3(v.x, v.y, v.z + this.zoneOffset); }
   private uniform(index: number, role: string) {
-    const key = `${role}:${index}`; let material = this.uniformMaterials.get(key);
+    const official = role === 'referee' || role === 'assistant';
+    const selected = officialsColor(this.officialsChoice, [this.appearance.kit.shirt, this.appearance.kit.secondary, '#b3364b', '#e9a643']);
+    const key = `${role}:${index}:${official ? selected : ''}`; let material = this.uniformMaterials.get(key);
     if (!material) {
       const user = role === '#d9fa6b', ally = role === '#65beed' && !this.appearance.training;
       const color = (role === 'referee' || role === 'assistant') ? '#202d3c' : role === '#65beed' ? '#2477ab' : role === '#dd5860' ? '#b3364b' : '#e9a643';
-      const kit: Kit = user || ally ? this.appearance.kit : { name: 'Uniforme simulado', shirt: color, secondary: '#e8edf0', ink: '#ffffff', shorts: '#1d354d', socks: color, pattern: 'plain' };
+      const kit: Kit = official ? OFFICIAL_KITS[selected] : user || ally ? this.appearance.kit : { name: 'Uniforme simulado', shirt: color, secondary: '#e8edf0', ink: '#ffffff', shorts: '#1d354d', socks: color, pattern: 'plain' };
       let number = user ? this.appearance.number : index === 1 && role === '#f7af65' ? 1 : index + 2;
       if (!user && number === this.appearance.number) number += 12;
-      const canvas = document.createElement('canvas'); paintPixelPlayers(canvas, kit, number, !['referee', 'assistant'].includes(role) && this.appearance.training, index);
+      const canvas = document.createElement('canvas'); paintPixelPlayers(canvas, kit, number, !['referee', 'assistant'].includes(role) && this.appearance.training, index, official ? 'official' : 'player');
       const map = new THREE.CanvasTexture(canvas); map.colorSpace = THREE.SRGBColorSpace;
       map.magFilter = map.minFilter = THREE.NearestFilter; map.generateMipmaps = false; map.repeat.set(1 / SPRITE_SIZE.frames, 1 / SPRITE_SIZE.directions); this.textures.push(map);
       material = new THREE.MeshBasicMaterial({ map, transparent: true, alphaTest: .5, side: THREE.DoubleSide, toneMapped: false });

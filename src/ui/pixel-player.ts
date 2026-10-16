@@ -50,7 +50,7 @@ function pixelNumber(c: CanvasRenderingContext2D, value: number, y: number, ink:
   c.fillStyle = ink; for (const p of pixels) c.fillRect(p.x, p.y, 1, 1);
 }
 /** Original hand-built pixel silhouettes. No external sprites, logos or licensed artwork. */
-export function paintPixelPlayers(canvas: HTMLCanvasElement, kit: Kit, number: number, training: boolean, skinIndex = 0) {
+export function paintPixelPlayers(canvas: HTMLCanvasElement, kit: Kit, number: number, training: boolean, skinIndex = 0, role: 'player' | 'official' = 'player') {
   canvas.width = SPRITE_SIZE.width * SPRITE_SIZE.frames; canvas.height = SPRITE_SIZE.height * SPRITE_SIZE.directions;
   const c = canvas.getContext('2d')!; c.imageSmoothingEnabled = false;
   const skin = ['#c58b61', '#925b3e', '#e1ad80'][skinIndex % 3]!, skinShadow = ['#986542', '#70422d', '#ba8059'][skinIndex % 3]!;
@@ -101,8 +101,8 @@ export function paintPixelPlayers(canvas: HTMLCanvasElement, kit: Kit, number: n
     c.restore();
     rect(side ? 20 : 17, 38, side ? 10 : 15, 5, kit.shorts);
     rect(side ? 28 : 17, 38, 1, 5, kit.secondary);
-    if (back && !side) pixelNumber(c, number, 26 + bob, kit.ink);
-    else if (!side) { rect(28, 25, 2, 3, kit.secondary); rect(28, 25, 1, 1, kit.ink); }
+    if (role === 'player' && back && !side) pixelNumber(c, number, 26 + bob, kit.ink);
+    else if (role === 'player' && !side && !back) { rect(28, 25, 2, 3, kit.secondary); rect(28, 25, 1, 1, kit.ink); }
     if (action === 'goal-check' && pose.step > 0) { rect(31, 23, 7, 3, kit.shirt); rect(37, 23, 7, 3, skin); }
     else arm(side ? 27 : 31, -stride, false);
     rect(side ? 23 : 22, 17, 5, 5, skinShadow); rect(side ? 23 : 21, 20, 6, 1, kit.secondary);

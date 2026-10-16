@@ -113,3 +113,5 @@ Para verificar os controles e gerar capturas de revisão dos uniformes: `npm run
 Os atletas agora usam pixel art/2D no campo 3D. “Ver jogador” na pausa oferece frente/costas e uma biblioteca demonstrativa de cabeceio, bicicleta, voleio, comemoração, cartões e lesão. Comemoração e sinais do árbitro acompanham gols/impedimentos reais da oportunidade; as demais demonstrações não aplicam eventos na carreira. Gol exige a bola inteira além da linha; impedimento usa snapshot dos corpos no passe.
 
 VAR e bandeirinhas: após uma oportunidade resolvida, use **Pausar → Rever lance com VAR**. Em partidas, gols/impedimentos envolvidos abrem a sequência automaticamente. Há take da sala com três integrantes, monitor de campo e deslocamento do árbitro; pausa, barra e retorno preservam o resultado. O protocolo é cinematográfico simplificado, com telas de evidência geométrica. Verificação: `npm run test:var`.
+
+Na pausa, **Uniforme da arbitragem** oferece preto, amarelo, vermelho e escolha automática por contraste. Árbitros/bandeirinhas usam roupas sem números ou inscrições; os três profissionais da central aparecem sentados.

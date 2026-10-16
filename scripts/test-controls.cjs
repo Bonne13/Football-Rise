@@ -99,8 +99,9 @@ const server = createServer(async (req, res) => {
       ctx.font = '15px sans-serif'; ctx.fillText('Prévia de poses · lances especiais, cartões e lesão são demonstrações', 30, 70);
       let row = 0;
       for (const [action, config] of Object.entries(PLAYER_ANIMATIONS)) {
-        const atlas = document.createElement('canvas'), kit = (action.endsWith('-card') || action === 'offside' || action === 'goal-check') ? { ...clubKits.kitsFor('vale')[0], shirt: '#202d3c', shorts: '#202d3c', socks: '#202d3c', pattern: 'plain' } : clubKits.kitsFor('vale')[0];
-        paintPixelPlayers(atlas, kit, 10, false);
+        const official = action.endsWith('-card') || action === 'offside' || action === 'goal-check' || action === 'assistant-flag';
+        const atlas = document.createElement('canvas'), kit = official ? { ...clubKits.kitsFor('vale')[0], shirt: '#202d3c', shorts: '#202d3c', socks: '#202d3c', pattern: 'plain' } : clubKits.kitsFor('vale')[0];
+        paintPixelPlayers(atlas, kit, 10, false, 0, official ? 'official' : 'player');
         const y = 90 + row * 150; ctx.fillStyle = row % 2 ? '#182b39' : '#132431'; ctx.fillRect(20, y, 960, 145);
         ctx.fillStyle = '#cee7dd'; ctx.font = 'bold 16px sans-serif'; ctx.fillText(config.label, 35, y + 28);
         for (let i = 0; i < 4; i++) {
