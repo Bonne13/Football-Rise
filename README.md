@@ -1,60 +1,35 @@
-# Football Rise — jogadores em pixel art, controles e arbitragem
+# Football Rise — bandeirinhas e VAR
 
-Novas prévias para aprovação. **O jogo público ainda não foi atualizado.**
+**Prévias reais da versão em desenvolvimento. O jogo público ainda não foi atualizado.**
 
-Jogadores 2D em pixel art, mantendo campo e estádios 3D. Uniformes e números integrados aos sprites. Mira e condução revisadas. O gol exige que a bola inteira ultrapasse a linha; impedimento usa as posições no momento do passe. Árbitro em campo e revisão da bola/linha pela pausa.
+A sequência acompanha um impedimento ocorrido na oportunidade jogável: sinal do bandeirinha, central de vídeo, deslocamento do árbitro ao monitor e comunicação da decisão. A sala tem três profissionais (VAR, AVAR e operador de replay), consoles, headsets e seis telas. Monitores e bandeirinha usam os mesmos dados congelados do lance.
 
-A folha abaixo mostra poses do atlas real usado no jogo. Comemoração e sinais de gol/impedimento acompanham os eventos jogáveis. Cabeceio, bicicleta, voleio, cartões e lesão estão disponíveis como **demonstrações de animação**; sua integração completa às regras das partidas ainda está pendente.
+Esta é uma apresentação cinematográfica simplificada, ligada às regras atuais de gol e impedimento. As telas mostram reconstruções esquemáticas dos dados, não seis gravações de câmeras. Revisões oficiais completas de faltas, pênaltis e vermelhos ainda não estão implementadas.
 
-Clique em cada imagem para ampliar.
+A revisão pode ser pausada, avançada ou fechada; o resultado é preservado e registrado uma única vez. Capturas abaixo geradas pelo aplicativo no Chromium, inclusive no tamanho de celular. Clique nas imagens para ampliar.
 
-## Cabeceio, bicicleta, voleio, comemoração, cartões, lesão e árbitro
+## Bandeirinha sinalizando um impedimento real da oportunidade
 
-![Cabeceio, bicicleta, voleio, comemoração, cartões, lesão e árbitro](14-pixel-animations.png)
+![Bandeirinha sinalizando um impedimento real da oportunidade](16-assistant-offside.png)
 
-## Novo jogador em pixel art — frente
+## Sala do VAR — três profissionais, headsets e seis telas
 
-![Novo jogador em pixel art — frente](10-shirt-front.png)
+![Sala do VAR — três profissionais, headsets e seis telas](17-var-room.png)
 
-## Uniforme principal — número 99
+## Árbitro se deslocando até o monitor
 
-![Uniforme principal — número 99](11-shirt-back-1.png)
+![Árbitro se deslocando até o monitor](18-referee-walking.png)
 
-## Uniforme visitante — número 10
+## Monitor exibindo os dados do mesmo lance
 
-![Uniforme visitante — número 10](11-shirt-back-2.png)
+![Monitor exibindo os dados do mesmo lance](19-pitchside-monitor.png)
 
-## Uniforme alternativo — número 7
+## Árbitro comunica a decisão
 
-![Uniforme alternativo — número 7](11-shirt-back-3.png)
+![Árbitro comunica a decisão](20-var-verdict.png)
 
-## Mira e força no mesmo gesto
+## Sala do VAR no navegador de celular
 
-![Mira e força no mesmo gesto](12-refined-aim.png)
+![Sala do VAR no navegador de celular](21-var-mobile.png)
 
-## Condução por direcional no campo
-
-![Condução por direcional no campo](13-dribble-control.png)
-
-## Revisão de gol — bola inteira além da linha
-
-![Revisão de gol — bola inteira além da linha](15-goal-line-review.png)
-
-[Baixar as novas imagens](previas-pixel-art.zip)
-
-<details>
-<summary>Prévias anteriores de estádios e competições</summary>
-
-![Prévia anterior](01-small-rural.png)
-
-![Prévia anterior](02-large-city.png)
-
-![Prévia anterior](03-mountains.png)
-
-![Prévia anterior](04-coast.png)
-
-![Prévia anterior](08-competitions.png)
-
-![Prévia anterior](09-awards.png)
-
-</details>
+[Baixar as imagens do VAR](previas-var.zip) · [Ver as prévias anteriores dos jogadores e animações](previas-pixel-art.md)
