@@ -14,7 +14,7 @@ let r=await p.locator('#football-field').boundingBox();await touch(r.x+10,r.y+r.
 r=await p.locator('#football-field').boundingBox();const x=r.x+r.width*.5,y=r.y+r.height*.55;
 await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}]});
 await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:x+18,y:y+90}]});await p.clock.runFor(100);
-assert.equal(await p.locator('.field-stage').getAttribute('data-phase'),'preparing');assert.equal(await p.locator('#aim-reticle').isVisible(),true);
+assert.equal(await p.locator('.field-stage').getAttribute('data-phase'),'preparing');assert.equal(await p.locator('#aim-reticle').count(),0);
 await p.screenshot({path:join(screenshots,'prepare.png'),fullPage:true});
 await cdp.send('Input.dispatchTouchEvent',{type:'touchCancel',touchPoints:[]});await p.clock.runFor(1000);assert.equal(await p.locator('#field-next').isVisible(),false);
 assert.equal(await p.locator('#contact-dock').isVisible(),false);
@@ -24,8 +24,8 @@ await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:x+18
 assert.equal(await p.locator('#contact-dock').isVisible(),false);
 await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await p.clock.runFor(1200);
 assert.equal(await p.locator('#contact-dock').isVisible(),true);assert.equal(await p.locator('#field-next').isVisible(),false);
-const before=await p.locator('#shot-power-value').innerText();const target=await p.locator('#aim-reticle').getAttribute('style');
-await touch(x+80,y);await p.clock.runFor(100);assert.equal(await p.locator('#aim-reticle').getAttribute('style'),target);assert.equal(await p.locator('#shot-power-value').innerText(),before);
+const before=await p.locator('#shot-power-value').innerText();const target=await p.locator('#football-field').getAttribute('data-aim');
+await touch(x+80,y);await p.clock.runFor(100);assert.equal(await p.locator('#football-field').getAttribute('data-aim'),target);assert.equal(await p.locator('#shot-power-value').innerText(),before);
 // Pause freezes presentation and exposes real sound preferences.
 await p.locator('#field-pause').click();assert.equal(await p.locator('#pause-menu').isVisible(),true);
 await p.locator('#field-sound').click();assert.equal(await p.locator('#field-sound').innerText(),'Som: desligado');

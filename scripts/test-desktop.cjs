@@ -65,10 +65,10 @@ const server = createServer(async (req, res) => {
     assert.equal(await field.getAttribute('data-renderer'), 'webgl');
     const x = r.x + r.width * .48, y = r.y + r.height * .5;
     await page.mouse.move(x, y); await page.mouse.down(); await page.mouse.move(x + 15, y + 95, { steps: 5 }); await page.clock.runFor(50);
-    const before = await page.locator('#aim-reticle').getAttribute('style');
+    const before = await page.locator('#football-field').getAttribute('data-aim');
     assert.equal(await page.locator('#contact-dock').isVisible(), false);
     await page.mouse.up(); await page.clock.runFor(50);
-    assert.equal(await page.locator('#aim-reticle').getAttribute('style'), before); // no camera zoom on confirmation
+    assert.equal(await page.locator('#football-field').getAttribute('data-aim'), before); // confirmation preserves the selected aim
     assert.equal(await page.locator('#contact-dock').isVisible(), true);
     const power = await page.locator('#shot-power-value').innerText();
     await page.screenshot({ path: join(screenshots, 'desktop-kit.png'), fullPage: true });

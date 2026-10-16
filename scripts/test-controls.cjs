@@ -56,9 +56,10 @@ const server = createServer(async (req, res) => {
     await field('shoot');
     const canvas = page.locator('#football-field'), r = await canvas.boundingBox(), x = r.x + r.width * .5, y = r.y + r.height * .5;
     await page.mouse.move(x, y); await page.mouse.down(); await page.mouse.move(x + 8, y + 60); await page.clock.runFor(50);
-    const target = await page.locator('#aim-reticle').getAttribute('style'), power = await page.locator('#shot-power-value').innerText();
+    assert.equal(await page.locator('#aim-reticle').count(), 0);
+    const target = await page.locator('#football-field').getAttribute('data-aim'), power = await page.locator('#shot-power-value').innerText();
     await page.mouse.move(x + 16, y + 120); await page.clock.runFor(50);
-    assert.equal(await page.locator('#aim-reticle').getAttribute('style'), target); assert.notEqual(await page.locator('#shot-power-value').innerText(), power);
+    assert.equal(await page.locator('#football-field').getAttribute('data-aim'), target); assert.notEqual(await page.locator('#shot-power-value').innerText(), power);
     await page.mouse.up(); await page.clock.runFor(50); assert.equal(await page.locator('#contact-dock').isVisible(), true);
     await page.screenshot({ path: join(screenshots, '12-refined-aim.png') });
     const ball = await page.locator('#contact-ball').boundingBox(); await page.mouse.click(ball.x + ball.width / 2, ball.y + ball.height / 2);

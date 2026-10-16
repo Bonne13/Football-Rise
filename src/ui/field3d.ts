@@ -60,7 +60,6 @@ export class Field3D {
   private ball: T.Mesh;
   private contactBall: T.Mesh;
   private contactMark: T.Mesh;
-  private aimMark: T.Mesh;
   private aimLine: T.Line;
   private trail: T.Line;
   private actors: T.Group[] = [];
@@ -116,7 +115,6 @@ export class Field3D {
     this.contactMark = new THREE.Mesh(new THREE.SphereGeometry(.055, 12, 8), new THREE.MeshBasicMaterial({ color: '#ff744c', depthTest: false })); this.contactMark.renderOrder = 5; this.contactScene.add(this.contactMark); this.setContact(0, 0);
     this.aimLine = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineDashedMaterial({ color: '#e0ff87', dashSize: .22, gapSize: .16, depthTest: false })); this.aimLine.renderOrder = 4; this.scene.add(this.aimLine);
     this.trail = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: '#efffea', transparent: true, opacity: .65 })); this.scene.add(this.trail);
-    this.aimMark = new THREE.Mesh(new THREE.TorusGeometry(.3, .025, 8, 32), new THREE.MeshBasicMaterial({ color: '#deff70', depthTest: false })); this.aimMark.renderOrder = 5; this.scene.add(this.aimMark);
     this.line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-34, .04, 0), new THREE.Vector3(34, .04, 0)]), new THREE.LineBasicMaterial({ color: '#ff963b' })); this.scene.add(this.line);
     this.observer = new ResizeObserver(() => this.resize()); this.observer.observe(canvas); this.observer.observe(contactCanvas); this.resize();
   }
@@ -264,8 +262,7 @@ export class Field3D {
     if (t.kind === 'technique') this.ball.visible = true;
     else if (phase === 'aiming' && ['shoot', 'freekick', 'pass', 'vision'].includes(t.kind)) this.ball.visible = false;
     this.aimLine.visible = !!aim && !t.shot && !['speed', 'technique'].includes(t.kind);
-    this.aimMark.visible = this.aimLine.visible;
-    if (aim && this.aimLine.visible) { this.setLine(this.aimLine, this.path(t, aim, curve, lift)); this.aimMark.position.copy(this.vector(aim, t.kind !== 'pass' && t.kind !== 'vision')); this.aimMark.rotation.x = t.kind === 'pass' || t.kind === 'vision' ? -Math.PI / 2 : 0; }
+    if (aim && this.aimLine.visible) { this.setLine(this.aimLine, this.path(t, aim, curve, lift));  }
     this.actors.forEach((actor, index) => {
       if (!actor.visible) return;
       const previous = actor.userData.attempt === `${t.kind}:${t.attempt}` ? actor.userData.previous as { x: number; z: number; time: number } | undefined : undefined;

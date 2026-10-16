@@ -18,7 +18,10 @@ export function freePullShot(origin: Point, dx: number, dy: number, maxPull: num
   const active = Number.isFinite(dx) && Number.isFinite(dy) && dy >= 12;
   const power = active ? Math.min(1, dy / limit) : 0;
   const forward = ground ? Math.min(origin.y - 95, power * 1100) : origin.y - 60;
-  const lateral = active ? dx / Math.max(24, dy) * forward * .65 : 0;
+  const slope = active ? dx / dy : 0;
+  // Ignore a tiny angular wobble; fine steering stays proportional at low and high charge.
+  const steering = Math.sign(slope) * Math.max(0, Math.abs(slope) - .015);
+  const lateral = steering * forward * .65;
   return { active, power, aim: { x: Math.max(-1500, Math.min(2500, origin.x - lateral)), y: ground ? origin.y - forward : 60 } };
 }
 

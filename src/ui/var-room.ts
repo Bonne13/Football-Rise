@@ -38,9 +38,11 @@ export class VARroom {
       c.fillStyle = skin; c.fillRect(x - 23, 453, 33, 8); c.fillRect(x + 28, 448, 24, 8); c.fillRect(x + 44, 435, 8, 17);
       c.strokeStyle = '#a6c1cb'; c.lineWidth = 5; c.beginPath(); c.arc(x + 2, 401, 22, Math.PI, 0); c.stroke();
       c.fillStyle = '#a3beca'; c.fillRect(x - 23, 400, 6, 14); c.fillRect(x + 21, 400, 6, 14); c.fillRect(x + 24, 413, 15, 3);
+      // Individual identification belongs to the workstation; officials' clothes stay plain.
+      c.fillStyle = '#0a1a25'; c.fillRect(x - 105, 550, 210, 20); c.fillStyle = '#b7e8df'; c.textAlign = 'center'; c.font = 'bold 12px monospace'; c.fillText(['VAR · ÁRBITRO DE VÍDEO', 'AVAR · ASSISTENTE VAR', 'OPERADOR DE REPLAY'][i]!, x, 564); c.textAlign = 'left';
     }
-    c.fillStyle = '#07131e'; c.fillRect(0, 553, 1000, 47); c.font = 'bold 18px monospace'; c.fillStyle = final ? '#b4f58d' : '#f3d47d';
-    c.fillText(final ? reviewVerdict(incident) : 'ANÁLISE EM ANDAMENTO · DADOS DO LANCE', 40, 581);
+    c.fillStyle = '#07131e'; c.fillRect(0, 572, 1000, 28); c.font = 'bold 18px monospace'; c.fillStyle = final ? '#b4f58d' : '#f3d47d';
+    c.fillText(final ? reviewVerdict(incident) : 'ANÁLISE EM ANDAMENTO · DADOS DO LANCE', 40, 593);
   }
 }
 export function drawReviewEvidence(c: CanvasRenderingContext2D, v: ReviewIncident, x: number, y: number, w: number, h: number, camera: number) {

@@ -41,3 +41,10 @@ test('aim direction stays fixed when pulling farther along the same angle; charg
   const diagonal = dribbleStick(100, 100)!; assert.ok(Math.abs(Math.hypot(diagonal.x, diagonal.y) - 1) < 1e-10);
   assert.ok(Math.hypot(dribbleStick(0, 30)!.x, dribbleStick(0, 30)!.y) < 1);
 });
+
+test('short pulls keep their angle and ignore tiny lateral tremors', async () => {
+  const { freePullShot } = await import('./aim-state.js'); const origin = { x: 440, y: 950 };
+  assert.deepEqual(freePullShot(origin, 2, 15, 120, false).aim, freePullShot(origin, 8, 60, 120, false).aim);
+  assert.equal(freePullShot(origin, .5, 90, 120, false).aim.x, origin.x);
+  assert.ok(freePullShot(origin, 5, 90, 120, false).aim.x < origin.x);
+});
