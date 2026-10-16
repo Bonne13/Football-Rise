@@ -235,3 +235,9 @@ Na central, os três operadores têm troncos apoiados em cadeiras, braços dobra
 ## Identificação do VAR e mira sem alvo final
 
 Cada posto da central identifica sua função: VAR (árbitro de vídeo), AVAR (assistente VAR) e operador de replay. As placas ficam nas bancadas; roupas continuam lisas. A mira mantém apenas a trajetória e o vetor de puxada, sem retículo HTML, anel 3D ou disco no destino no fallback 2D. A inclinação da puxada preserva a direção também em cargas curtas; uma pequena zona angular neutra reduz tremores laterais. Soltar confirma direção/força; tocar na esfera revelada depois seleciona curva e executa com os valores confirmados.
+
+## Central do VAR de costas e leitura dos treinos
+
+A câmera da central vê a equipe por trás: nuca/cabelo sem rosto, costas e encosto da cadeira, braços dirigidos ao console e mãos no teclado diante das telas. Placas individuais continuam nas bancadas. Evidências e decisões não mudam.
+
+Nos exercícios de meio-campo, a câmera sobe para 8 m, preservando enquadramento nas fases de mira e curva. Condução distingue o portão ativo em verde-água dos posteriores e informa ordem, tempo e contatos com cones, também no fallback 2D. Corrida mostra divisórias das faixas, km/h e distância restante; domínio acelera até um teto dependente de pace, reduz velocidade em 35% por obstáculo atingido e concede até 18 s para completar os 100 m. Técnica continua usando aceleração/frenagem e controle próximo da bola por atributos. Nenhum formato de save é alterado. `TRAINING_REVIEW=1 node scripts/test-controls.cjs` verifica quatro exercícios, confirmação única de passe, pausa e tela estreita; testes de domínio cobrem velocidade/atributos e recuperação após impacto.

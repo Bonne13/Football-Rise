@@ -118,6 +118,7 @@ export class Field3D {
     this.line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-34, .04, 0), new THREE.Vector3(34, .04, 0)]), new THREE.LineBasicMaterial({ color: '#ff963b' })); this.scene.add(this.line);
     this.observer = new ResizeObserver(() => this.resize()); this.observer.observe(canvas); this.observer.observe(contactCanvas); this.resize();
   }
+  private sprintLanes: T.Mesh[] = [];
   private material(color: string) { let value = this.materials.get(color); if (!value) { value = new THREE.MeshStandardMaterial({ color, roughness: .85 }); this.materials.set(color, value); } return value; }
   private buildPitch() {
     const turf = document.createElement('canvas'); turf.width = turf.height = 256; const tc = turf.getContext('2d')!;
@@ -218,9 +219,12 @@ export class Field3D {
     const key = JSON.stringify([this.size, this.contactSize, t.kind, t.attempt, t.time, this.varView?.phase, this.varView ? Math.floor(this.varView.progress * 90) : null, t.outcome, aim?.x, aim?.y, curve, lift, phase, this.overview, this.portrait, this.portraitBack, this.goalReview, contactVisible, this.animationPreview, this.animationPreview ? playerAnimationFrame(this.animationPreview, animationTime - this.previewStart!) : null, celebration]);
     if (key === this.renderKey) return; this.renderKey = key;
     this.actors.forEach(a => { a.visible = false; }); this.cones.forEach(a => { a.visible = false; }); this.gates.forEach(a => { a.visible = false; });
+    if (!this.sprintLanes.length) for (const x of [293, 587]) { const lane = new THREE.Mesh(new THREE.BoxGeometry(.045, .015, 26), this.material('#c4d3a9')); lane.userData.localX = x; this.scene.add(lane); this.sprintLanes.push(lane); }
+    this.sprintLanes.forEach(lane => { lane.visible = t.kind === 'speed'; lane.position.copy(this.vector({ x: lane.userData.localX, y: 650 })); lane.position.y = .025; });
     this.line.visible = t.kind === 'vision' || t.kind === 'pass'; this.line.position.z = this.zoneOffset + (t.offsideLine - 95) / 50; let count = 0;
     let focus = t.kind === 'technique' ? t.player : t.origin;
     if (t.kind === 'speed') focus = { x: [147, 440, 733][t.lane]!, y: 1160 };
+    const midfield = ['pass', 'vision', 'technique', 'speed'].includes(t.kind);
     const centre = this.vector(focus); this.reviewMonitor.group.position.z = this.zoneOffset + 13;
     const refStart = this.vector(t.referee.position), monitor = this.reviewMonitor.group.position;
     const walk = this.varView?.phase === 'walk' ? this.varView.progress : this.varView?.phase === 'monitor' ? 1 : 0;
@@ -233,11 +237,11 @@ export class Field3D {
     else if (this.goalReview && t.shot) { const ball = t.shot.ball.position; this.camera.position.set(ball.x + 2, ball.y + 2, ball.z + 1.1); this.camera.lookAt(ball.x, ball.y * .45, ball.z); }
     else if (this.portrait) { const subject = this.vector(['speed', 'technique'].includes(t.kind) ? focus : { x: t.origin.x - 40, y: t.origin.y + 25 }); this.camera.position.set(subject.x + 1.2, 1.35, subject.z + (this.portraitBack ? 3.2 : -3.2)); this.camera.lookAt(subject.x, .95, subject.z); }
     else if (this.overview) { this.camera.position.set(105, 95, 158); this.camera.lookAt(0, 0, 52.5); }
-    else { this.camera.position.set(centre.x + .3, 5.4, centre.z + 9.5); this.camera.lookAt(centre.x, 1.05, Math.max(0, centre.z - 12)); }
+    else { this.camera.position.set(centre.x + .3, midfield ? 8 : 5.4, centre.z + 9.5); this.camera.lookAt(centre.x, 1.05, Math.max(0, centre.z - (midfield ? 5 : 12))); }
     this.camera.updateMatrixWorld();
     if (t.kind === 'technique') {
       this.actor(count++, t.player, '#d9fa6b'); this.ball.position.copy(this.vector(t.ball)); this.ball.position.y = BALL_RADIUS + Math.abs(Math.sin(t.time * 10)) * Math.min(.045, Math.hypot(t.velocity.x, t.velocity.y) / 5000); this.ball.rotation.x = t.travel / 12; this.ball.rotation.z = -t.travel / 24;
-      t.gates.forEach((p, i) => { let gate = this.gates[i]; if (!gate) { gate = new THREE.Mesh(new THREE.TorusGeometry(.65, .06, 8, 24), this.material('#d7fa76')); gate.rotation.x = -Math.PI / 2; this.scene.add(gate); this.gates[i] = gate; } gate.visible = i >= t.gate; gate.position.copy(this.vector(p)); gate.position.y = .05; gate.scale.setScalar(i === t.gate ? 1.2 : .8); });
+      t.gates.forEach((p, i) => { let gate = this.gates[i]; if (!gate) { gate = new THREE.Mesh(new THREE.TorusGeometry(.65, .06, 8, 24), this.material('#d7fa76')); gate.rotation.x = -Math.PI / 2; this.scene.add(gate); this.gates[i] = gate; } gate.visible = i >= t.gate; gate.position.copy(this.vector(p)); gate.position.y = .05; gate.scale.setScalar(i === t.gate ? 1.2 : .8); gate.material = this.material(i === t.gate ? '#7cf5db' : '#718768'); });
       t.cones.forEach((p, i) => this.obstacle(i, p));
     } else if (t.kind === 'speed') {
       this.actor(count++, focus, '#d9fa6b'); this.ball.visible = false;

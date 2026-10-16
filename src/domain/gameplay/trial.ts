@@ -139,8 +139,11 @@ function step(t: Trial, dt: number) {
   }
 
   if (t.kind === 'speed') {
-    t.distance += dt * 14;
-    for (const obstacle of t.obstacles) if (!obstacle.passed && t.distance >= obstacle.distance) { obstacle.passed = true; if (obstacle.lane === t.lane) t.collisions++; }
+    // Pace sets top speed; acceleration and impacts make lane choices matter physically.
+    const topSpeed = 7 + t.running * .045;
+    t.velocity.y = Math.min(topSpeed, t.velocity.y + (5 + t.running * .05) * dt);
+    t.distance += dt * t.velocity.y;
+    for (const obstacle of t.obstacles) if (!obstacle.passed && t.distance >= obstacle.distance) { obstacle.passed = true; if (obstacle.lane === t.lane) { t.collisions++; t.velocity.y *= .65; } }
     if (t.distance >= 100) { finish(t, 100 - t.collisions * 20, `100 metros! ${t.collisions} colisões.`, 'complete'); return; }
   }
   if (t.kind === 'technique') {
@@ -162,6 +165,6 @@ function step(t: Trial, dt: number) {
     const gate = t.gates[t.gate]; if (gate && distance(gate, t.ball) < 40 && distance(gate, t.player) < 55) t.gate++;
     if (t.gate === t.gates.length) { finish(t, 100 - t.collisions * 15 - Math.max(0, t.time - 12) * 2, 'Circuito concluído! Boa condução.', 'complete'); return; }
   }
-  const limit = t.kind === 'technique' ? 22 : t.kind === 'speed' ? 9 : 15;
+  const limit = t.kind === 'technique' ? 22 : t.kind === 'speed' ? 18 : 15;
   if (t.time >= limit) finish(t, t.kind === 'technique' ? Math.max(0, t.gate * 15 - t.collisions * 15) : 0, 'Tempo encerrado. Tente de novo na próxima tentativa.', 'timeout');
 }

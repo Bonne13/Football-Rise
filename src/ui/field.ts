@@ -50,7 +50,7 @@ export function mountField(host: HTMLElement, options: Options): () => void {
   catch {
     const fresh = canvas.cloneNode(true) as HTMLCanvasElement; canvas.replaceWith(fresh); canvas = fresh;
     const freshBall = contactCanvas.cloneNode(true) as HTMLCanvasElement; contactCanvas.replaceWith(freshBall); contactCanvas = freshBall;
-    canvas.dataset.renderer = '2d'; $('renderer-status').textContent = '3D indisponível neste navegador. Modo leve ativado. Toque no gol para mirar.';
+    canvas.dataset.renderer = '2d'; $('renderer-status').textContent = '3D indisponível neste navegador. Modo leve ativado. Puxe para definir mira e força.';
   }
   const quality = $<HTMLSelectElement>('field-quality');
   try { const saved = localStorage.getItem('football-rise.graphics.v1'); if (saved && ['auto', 'high', 'low'].includes(saved)) quality.value = saved; } catch {}
@@ -84,7 +84,7 @@ export function mountField(host: HTMLElement, options: Options): () => void {
     $('field-zone').textContent = `${['shoot', 'freekick'].includes(kind) ? (trial.layout === 0 ? 'Frente do gol' : trial.layout === 1 ? 'Lado esquerdo' : 'Lado direito · longa distância') : trial.layout === 0 ? 'Meio-campo' : trial.layout === 1 ? 'Meio-campo · lado esquerdo' : 'Meio-campo · lado direito'} · cenário ${trial.layout + 1}/3`;
     $('drill-hint').textContent = hints[kind];
     $('shot-effects').hidden = true; $('shot-effects').removeAttribute('open'); $('ball-control').hidden = true; $('contact-dock').hidden = true; $('lane-buttons').hidden = kind !== 'speed'; next.hidden = true;
-    feedback.textContent = kind === 'technique' ? 'Arraste para conduzir, solte para frear. No computador, use WASD ou as setas.' : kind === 'speed' ? 'Escolha uma faixa e desvie dos obstáculos.' : 'Puxe para trás, ajuste para os lados e solte para jogar.';
+    feedback.textContent = kind === 'technique' ? 'Arraste para conduzir, solte para frear. No computador, use WASD ou as setas.' : kind === 'speed' ? 'Escolha uma faixa e desvie dos obstáculos.' : 'Puxe para trás, ajuste para os lados e solte para confirmar. Depois toque na bola para executar.';
     updatePhase();
     canvas.setAttribute('aria-label', `Campo de futebol: ${DRILL_NAMES[kind]}`); draw();
   }
@@ -99,7 +99,7 @@ export function mountField(host: HTMLElement, options: Options): () => void {
     $('contact-dock').hidden = !confirmed; $('ball-control').hidden = !prepared;
     $('shot-effects').hidden = true; $('aim-reset').hidden = !confirmed;
     $('coach-title').textContent = !shotMode() ? (trial?.kind === 'speed' ? 'Acelere. Desvie. Chegue.' : 'A bola obedece ao seu toque.') : phase === 'aiming' ? (groundMode() ? 'Encontre o passe.' : 'Escolha seu canto.') : phase === 'preparing' ? (confirmed ? 'Mira e força confirmadas.' : 'Mova para ajustar. Solte para confirmar.') : phase === 'flight' ? 'Acompanhe a jogada.' : 'Cada tentativa conta.';
-    $('drill-hint').textContent = !shotMode() ? hints[trial!.kind] : phase === 'aiming' ? (groundMode() ? 'Puxe para trás e mova para os lados para direcionar o passe.' : 'Puxe o dedo para trás. Ajuste para os lados e solte para confirmar mira e força.') : phase === 'preparing' ? (confirmed ? 'Clique ou toque na bola para escolher a curva e chutar. Centro = chute reto.' : 'Continue puxando e ajuste para os lados. Solte para confirmar.') : phase === 'flight' ? 'Bola em jogo.' : 'Veja sua nota e siga para a próxima tentativa.';
+    $('drill-hint').textContent = !shotMode() ? hints[trial!.kind] : phase === 'aiming' ? (groundMode() ? hints[trial!.kind] : 'Puxe o dedo para trás. Ajuste para os lados e solte para confirmar mira e força.') : phase === 'preparing' ? (confirmed ? 'Clique ou toque na bola para escolher a curva e chutar. Centro = chute reto.' : 'Continue puxando e ajuste para os lados. Solte para confirmar.') : phase === 'flight' ? 'Bola em jogo.' : 'Veja sua nota e siga para a próxima tentativa.';
   }
   function chooseTarget(target: Point) {
     selectedAim = { ...target }; aim = { ...target }; phase = 'preparing'; confirmed = true;
@@ -297,6 +297,15 @@ export function mountField(host: HTMLElement, options: Options): () => void {
     ctx!.drawImage(sheet, frame * SPRITE_SIZE.width, (user ? 1 : 0) * SPRITE_SIZE.height, SPRITE_SIZE.width, SPRITE_SIZE.height, Math.round(v.x - 48 * scale), Math.round(v.y - 104 * scale), Math.round(96 * scale), Math.round(120 * scale));
   }
   function draw() {
+    if (trial && !trial.resolved) {
+      if (trial.kind === 'technique') {
+        $('coach-title').textContent = `Portão ${Math.min(trial.gates.length, trial.gate + 1)} de ${trial.gates.length} · siga o verde-água`;
+        feedback.textContent = `${trial.collisions} toques nos cones · ${Math.max(0, 22 - trial.time).toFixed(1)} s restantes. Atravesse com o jogador e a bola.`;
+      } else if (trial.kind === 'speed') {
+        $('coach-title').textContent = `Faixa ${trial.lane + 1} de 3 · ${Math.round(trial.velocity.y * 3.6)} km/h`;
+        feedback.textContent = `${trial.collisions} colisões · ${Math.max(0, 100 - trial.distance).toFixed(0)} m até a chegada. Colidir reduz sua velocidade.`;
+      }
+    }
     canvas.dataset.aim = aim ? JSON.stringify(aim) : '';
     canvas.style.cursor = confirmed ? 'default' : drag ? 'grabbing' : 'grab';
     const gesture = drag ?? dribbleDrag;
@@ -333,7 +342,7 @@ export function mountField(host: HTMLElement, options: Options): () => void {
       for (const o of t.obstacles) if (!o.passed && o.distance - t.distance < 55) { const p = { x: [147, 440, 733][o.lane]!, y: 1150 - (o.distance - t.distance) * 20 }; disc(p, 70, '#ef7049'); }
       actor({ x: [147, 440, 733][t.lane]!, y: 1160 }, options.appearance.kit.shirt, String(options.appearance.number));
     } else if (t.kind === 'technique') {
-      t.gates.forEach((p, i) => { if (i >= t.gate) { line([{ x: p.x - 50, y: p.y }, { x: p.x + 50, y: p.y }], i === t.gate ? '#e0ff67' : '#b8e8cc77', 12); const v = project(p); ctx!.font = 'bold 28px system-ui'; ctx!.fillStyle = '#fff'; ctx!.fillText(String(i + 1), v.x, v.y - 20); } });
+      t.gates.forEach((p, i) => { if (i >= t.gate) { line([{ x: p.x - 50, y: p.y }, { x: p.x + 50, y: p.y }], i === t.gate ? '#7cf5db' : '#718768', 12); const v = project(p); ctx!.font = 'bold 28px system-ui'; ctx!.fillStyle = '#fff'; ctx!.fillText(String(i + 1), v.x, v.y - 20); } });
       t.cones.forEach(p => disc(p, 30, '#ff873c')); actor(t.player, options.appearance.kit.shirt); disc(t.ball, 13, '#fff');
     } else {
       actor({ x: t.origin.x - 38, y: t.origin.y + 38 }, options.appearance.kit.shirt, String(options.appearance.number));

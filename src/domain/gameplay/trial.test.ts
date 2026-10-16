@@ -172,3 +172,22 @@ test('goal result and the rendered ball share the same complete line crossing; s
   const offside = kick('vision', { x: 330, y: 120 });
   assert.equal(offside.outcome, 'offside'); assert.equal(offside.referee.signal, 'offside'); assert.equal(offside.shot!.offsideSnapshot!.offside, true);
 });
+
+
+test('sprint accelerates according to pace and loses speed on an obstacle', () => {
+  const slow = createTrial('speed', 1, 42, 100, { technique: 50, pace: 10 });
+  const fast = createTrial('speed', 1, 42, 100, { technique: 50, pace: 90 });
+  for (const t of [slow, fast]) { t.started = true; t.obstacles = []; tickTrial(t, .1); }
+  assert.ok(fast.velocity.y > slow.velocity.y); assert.ok(fast.velocity.y < 10);
+  for (const t of [slow, fast]) advance(t, 1);
+  assert.ok(fast.distance > slow.distance);
+  const before = fast.velocity.y; fast.obstacles = [{ distance: fast.distance + .01, lane: fast.lane, passed: false }];
+  tickTrial(fast, .025); assert.equal(fast.collisions, 1); assert.ok(fast.velocity.y < before);
+  const reduced = fast.velocity.y; tickTrial(fast, .1); assert.equal(fast.collisions, 1); assert.ok(fast.velocity.y > reduced);
+  const times: number[] = [];
+  for (const pace of [0, 100]) {
+    const t = createTrial('speed', 1, 42, 100, { technique: 50, pace }); t.started = true; t.obstacles = [];
+    advance(t, 18); assert.equal(t.outcome, 'complete'); times.push(t.time);
+  }
+  assert.ok(times[1]! < times[0]!);
+});

@@ -36,6 +36,33 @@ const server = createServer(async (req, res) => {
       console.log('Mounted', kind, kit, number);
       await page.clock.runFor(50); assert.equal(await page.locator('#football-field').getAttribute('data-renderer'), 'webgl');
     }
+    if (process.env.TRAINING_REVIEW) {
+      for (const kind of ['pass', 'vision', 'technique', 'speed']) {
+        await field(kind);
+        const c = page.locator('#football-field'), box = await c.boundingBox();
+        const x = box.x + box.width * .5, y = box.y + box.height * .5;
+        if (kind === 'pass' || kind === 'vision') {
+          await page.mouse.move(x, y); await page.mouse.down(); await page.mouse.move(x + 25, y + 80); await page.mouse.up(); await page.clock.runFor(50);
+          assert.equal(await page.locator('#contact-dock').isVisible(), true);
+          assert.equal(await page.locator('#aim-reticle').count(), 0);
+          assert.match(await page.locator('#field-zone').innerText(), /Meio-campo/);
+        } else if (kind === 'speed') {
+          await page.locator('#lane-left').click(); await page.clock.runFor(500);
+          assert.match(await page.locator('#coach-title').innerText(), /Faixa 1 de 3/);
+          assert.match(await page.locator('#field-feedback').innerText(), /Colidir reduz/);
+        } else {
+          await page.mouse.move(x, y); await page.mouse.down(); await page.mouse.move(x, y - 65); await page.clock.runFor(300); await page.mouse.up();
+          assert.match(await page.locator('#coach-title').innerText(), /Portão 1 de 5/);
+        }
+        await page.screenshot({ path: join(screenshots, `25-training-${kind}.png`) });
+        await page.locator('#field-pause').click(); const clock = await page.locator('#field-clock').innerText(); await page.clock.runFor(300);
+        assert.equal(await page.locator('#field-clock').innerText(), clock);
+      }
+      await page.setViewportSize({width:390,height:844}); await field('technique');
+      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth), true);
+      await page.screenshot({path:join(screenshots,'26-training-mobile.png')});
+      assert.deepEqual(errors, []); console.log('Training passed: four midfield drills, locked pass aim/power, single curve stage, gate guidance, sprint lanes/speed, pause and mobile layout.'); return;
+    }
     if (!process.env.GOAL_REVIEW_ONLY) {
     for (const [kit, number] of [[0, 99], [1, 10], [2, 7]]) {
       await field('shoot', kit, number);
