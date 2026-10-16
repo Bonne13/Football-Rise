@@ -14,7 +14,8 @@ function consolidateBoxes(parent: T.Object3D) {
   }
 }
 /** Procedural four-sided stadium and scenery; independent of the football rules. */
-export function buildStadium(scene: T.Scene, profile: StadiumProfile, colors: { primary: string; secondary: string }) {
+export function buildStadium(scene: T.Scene, profile: StadiumProfile, colors: { primary: string; secondary: string }, occupancy = 0) {
+  const crowds: T.InstancedMesh[] = [];
   const seatColors = profile.seatColors ?? [colors.primary, colors.secondary];
   let seed = profile.seed;
   const random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
@@ -91,17 +92,17 @@ export function buildStadium(scene: T.Scene, profile: StadiumProfile, colors: { 
     }
     const fence = new THREE.Mesh(new THREE.BoxGeometry(side.length, profile.size === 'local' ? 1.15 : 1.8, .15), dark); fence.position.set(0, profile.size === 'local' ? .6 : .9, 2); stand.add(fence);
     // Lightweight instanced spectators in the match arenas, leaving clear access aisles.
-    if (profile.size === 'arena') {
+    if (occupancy > 0) {
       const crowd = new THREE.InstancedMesh(new THREE.CapsuleGeometry(.15, .24, 2, 5), material('#ffffff'), rows * seatsPerRow);
       crowd.name = 'spectator-crowd';
       let people = 0;
       for (let row = 0; row < rows; row++) for (let seat = 0; seat < seatsPerRow; seat++) {
         const x = -side.length / 2 + .5 + seat * .72;
-        if (Math.abs(x) < 1 || Math.abs(Math.abs(x) - side.length / 3) < 1 || random() > .62) continue;
+        if (Math.abs(x) < 1 || Math.abs(Math.abs(x) - side.length / 3) < 1 || random() > occupancy) continue;
         crowd.setMatrixAt(people, new THREE.Matrix4().makeTranslation(x, 1.08 + row * .56, -row * 1.05));
         crowd.setColorAt(people, new THREE.Color([colors.primary, colors.secondary, '#bd967b', '#253747', '#e2dacb'][people % 5])); people++;
       }
-      crowd.count = people; crowd.instanceMatrix.needsUpdate = true; stand.add(crowd);
+      crowd.count = people; crowd.instanceMatrix.needsUpdate = true; stand.add(crowd); crowds.push(crowd);
     }
     consolidateBoxes(stand); scene.add(stand);
   }
@@ -110,13 +111,14 @@ export function buildStadium(scene: T.Scene, profile: StadiumProfile, colors: { 
     const corners = [{ x: 34, z: 0, angle: 0 }, { x: -34, z: 0, angle: Math.PI / 2 }, { x: -34, z: 105, angle: Math.PI }, { x: 34, z: 105, angle: Math.PI * 1.5 }];
     for (const corner of corners) {
       const count = rows * 14, seats = new THREE.InstancedMesh(seatGeo, seatMat, count); let index = 0;
+      const supporters = new THREE.InstancedMesh(new THREE.CapsuleGeometry(.15, .24, 2, 5), material('#ffffff'), count); let people = 0;
       for (let row = 0; row < rows; row++) {
         const radius = 8 + row * 1.05, height = .55 + row * .56;
         const step = new THREE.Mesh(new THREE.RingGeometry(radius, radius + 1.05, 20, 1, corner.angle, Math.PI / 2), concrete); step.rotation.x = -Math.PI / 2; step.position.set(corner.x, height, corner.z); scene.add(step);
-        for (let seat = 0; seat < 14; seat++) { const angle = corner.angle + (seat + .5) / 14 * Math.PI / 2; seats.setMatrixAt(index, new THREE.Matrix4().makeTranslation(corner.x + Math.cos(angle) * radius, height + .2, corner.z - Math.sin(angle) * radius)); seats.setColorAt(index, new THREE.Color(seat % 5 ? seatColors[0] : seatColors[1])); index++; }
+        for (let seat = 0; seat < 14; seat++) { const angle = corner.angle + (seat + .5) / 14 * Math.PI / 2; seats.setMatrixAt(index, new THREE.Matrix4().makeTranslation(corner.x + Math.cos(angle) * radius, height + .2, corner.z - Math.sin(angle) * radius)); seats.setColorAt(index, new THREE.Color(seat % 5 ? seatColors[0] : seatColors[1])); if (random() < occupancy) { supporters.setMatrixAt(people, new THREE.Matrix4().makeTranslation(corner.x + Math.cos(angle) * radius, height + .55, corner.z - Math.sin(angle) * radius)); supporters.setColorAt(people, new THREE.Color(people % 3 ? colors.primary : colors.secondary)); people++; } index++; }
       }
       const roof = new THREE.Mesh(new THREE.RingGeometry(7.8, 23, 28, 1, corner.angle, Math.PI / 2), pale); roof.rotation.x = -Math.PI / 2; roof.position.set(corner.x, top + 2.5, corner.z); roof.material.side = THREE.DoubleSide; roof.castShadow = true; scene.add(roof);
-      seats.instanceMatrix.needsUpdate = true; scene.add(seats);
+      seats.instanceMatrix.needsUpdate = true; scene.add(seats); supporters.count = people; supporters.instanceMatrix.needsUpdate = true; scene.add(supporters); crowds.push(supporters);
       for (let i = 0; i < 3; i++) { const angle = corner.angle + i / 2 * Math.PI / 2; box(scene, [.15, top + 2.5, .15], [corner.x + Math.cos(angle) * 22, (top + 2.5) / 2, corner.z - Math.sin(angle) * 22], dark); }
     }
   }
@@ -138,11 +140,11 @@ export function buildStadium(scene: T.Scene, profile: StadiumProfile, colors: { 
         const transform = new THREE.Object3D(); transform.position.set(x, height + .2, z); transform.rotation.y = -angle; transform.updateMatrix();
         const index = row * seatsPerRow + seat; chairs.setMatrixAt(index, transform.matrix); chairs.setColorAt(index, new THREE.Color(seat % 32 < 8 ? seatColors[1] : seatColors[0]));
         if (seat % 28 < 2) continue;
-        if (profile.size === 'arena' && random() < .55) { crowd.setMatrixAt(people, new THREE.Matrix4().makeTranslation(x, height + .55, z)); crowd.setColorAt(people, new THREE.Color([colors.primary, colors.secondary, '#bd967b', '#253747'][people % 4])); people++; }
+        if (random() < occupancy) { crowd.setMatrixAt(people, new THREE.Matrix4().makeTranslation(x, height + .55, z)); crowd.setColorAt(people, new THREE.Color([colors.primary, colors.secondary, '#bd967b', '#253747'][people % 4])); people++; }
       }
       if (row > 0 && row % Math.max(1, Math.floor(rows / profile.tiers)) === 0) ellipse(rx + 1, rz + 1, rx + .65, rz + .65, clubTrim, height + .4);
     }
-    chairs.instanceMatrix.needsUpdate = true; scene.add(chairs); crowd.count = people; crowd.instanceMatrix.needsUpdate = true; scene.add(crowd);
+    chairs.instanceMatrix.needsUpdate = true; scene.add(chairs); crowd.count = people; crowd.instanceMatrix.needsUpdate = true; scene.add(crowd); crowds.push(crowd);
     const outerX = innerX + rows * 1.05, outerZ = innerZ + rows * 1.05;
     const facade = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, rows * .56 + 1, 96, 1, true), new THREE.MeshStandardMaterial({ color: '#a1aba8', roughness: .8, side: THREE.DoubleSide }));
     facade.scale.set(outerX + 2, 1, outerZ + 2); facade.position.set(0, rows * .28, 52.5); scene.add(facade);
@@ -199,4 +201,5 @@ export function buildStadium(scene: T.Scene, profile: StadiumProfile, colors: { 
     const hills = new THREE.Mesh(terrain, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 })); hills.rotation.x = -Math.PI / 2; hills.position.set(0, -.6, 52.5); scene.add(hills);
   }
   consolidateBoxes(scene);
+  return crowds;
 }

@@ -1,29 +1,9 @@
 import type * as T from 'three';
 import type { StadiumProfile } from '../data/stadiums.js';
 declare const THREE: typeof T;
-export interface GroundFootprint { halfX: number; halfZ: number }
-interface Building { x: number; z: number; width: number; depth: number; height: number; pitched: boolean; tint: number }
-/** A street-based district, leaving the stadium, its concourse and service access clear. */
-export function surroundingLayout(profile: StadiumProfile, footprint: GroundFootprint): Building[] {
-  let seed = profile.seed;
-  const random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
-  const homes: Building[] = [];
-  const dense = profile.landscape !== 'rural';
-  for (let side = 0; side < 4; side++) for (let row = 0; row < (dense ? 3 : 2); row++) for (let lot = -5; lot <= 5; lot++) {
-    if (random() < (dense ? .16 : .5)) continue;
-    const width = 8 + random() * 4, depth = 8 + random() * 4;
-    const apartment = dense && row > 0 && random() > .55;
-    const height = apartment ? 9 + Math.floor(random() * 4) * 3 : 3.6 + Math.floor(random() * 2) * 3;
-    const along = lot * 17 + (random() - .5) * 3;
-    const outward = (side < 2 ? footprint.halfZ : footprint.halfX) + 37 + row * 34;
-    // Rows occupy road blocks, not a ring of disconnected towers.
-    homes.push({ x: side < 2 ? along : (side === 2 ? -outward : outward), z: 52.5 + (side < 2 ? (side === 0 ? -outward : outward) : along), width, depth, height, pitched: !apartment, tint: Math.floor(random() * 5) });
-  }
-  return homes.filter(b => {
-    const acrossRoad = (position: number, half: number, extent: number) => [19, 53, 87].some(offset => Math.abs(Math.abs(position) - half - offset) < extent / 2 + 8);
-    return !acrossRoad(b.x, footprint.halfX, b.width) && !acrossRoad(b.z - 52.5, footprint.halfZ, b.depth);
-  });
-}
+import { districtPlan, type Footprint } from '../data/stadium-districts.js';
+export type GroundFootprint = Footprint;
+export const surroundingLayout = (profile: StadiumProfile, footprint: Footprint) => districtPlan(profile, footprint).homes;
 export function buildSurroundings(scene: T.Scene, profile: StadiumProfile, footprint: GroundFootprint) {
   const materials = new Map<string, T.MeshStandardMaterial>();
   const mat = (color: string) => { let m = materials.get(color); if (!m) { m = new THREE.MeshStandardMaterial({ color, roughness: .88 }); materials.set(color, m); } return m; };
@@ -31,38 +11,31 @@ export function buildSurroundings(scene: T.Scene, profile: StadiumProfile, footp
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), typeof color === 'string' ? mat(color) : color); mesh.position.set(x, y, z); mesh.receiveShadow = true; scene.add(mesh); return mesh;
   };
   const pavement = '#a7a99f', asphalt = '#53585b', line = '#dddcc5';
-  // Four connected streets, sidewalks and zebra crossings around a pedestrian apron.
-  const roadX = footprint.halfX + 19, roadZ = footprint.halfZ + 19;
-  for (const sign of [-1, 1]) {
-    const z = 52.5 + sign * roadZ, x = sign * roadX;
-    box(roadX * 2 + 70, .12, 11, 0, .005, z, asphalt);
-    box(11, .12, roadZ * 2 + 70, x, .006, 52.5, asphalt);
-    for (const edge of [-1, 1]) {
-      box(roadX * 2 + 70, .2, 2.3, 0, .09, z + edge * 6.7, pavement);
-      box(2.3, .2, roadZ * 2 + 70, x + edge * 6.7, .09, 52.5, pavement);
-    }
-    for (let pos = -roadX; pos <= roadX; pos += 12) box(4, .015, .16, pos, .075, z, line);
-    for (let pos = -roadZ; pos <= roadZ; pos += 12) box(.16, .015, 4, x, .076, 52.5 + pos, line);
-    for (let stripe = -3; stripe <= 3; stripe++) { box(.7, .018, 8, stripe * 1.3, .08, z, line); box(8, .018, .7, x, .08, 52.5 + stripe * 1.3, line); }
-    // Secondary roads between the rows of homes give the district depth.
-    for (const shift of [34, 68]) {
-      box(255, .1, 7, 0, .005, z + sign * shift, asphalt);
-      box(7, .1, 255, x + sign * shift, .005, 52.5, asphalt);
+  const plan = districtPlan(profile, footprint);
+  for (const r of plan.roads) {
+    const dx = r.bx - r.ax, dz = r.bz - r.az, length = Math.hypot(dx, dz), angle = -Math.atan2(dz, dx);
+    const segment = (width: number, height: number, depth: number, offset: number, color: string, y: number) => {
+      const m = box(width, height, depth, (r.ax + r.bx) / 2 - dz / length * offset, y, 52.5 + (r.az + r.bz) / 2 + dx / length * offset, color); m.rotation.y = angle;
+    };
+    segment(length, .12, r.width, 0, asphalt, .005);
+    for (const side of [-1, 1]) segment(length, .2, 1.7, side * (r.width / 2 + 1), pavement, .09);
+    for (let along = 8; along < length; along += 13) {
+      const mark = box(4, .015, .13, r.ax + dx / length * along, .075, 52.5 + r.az + dz / length * along, line); mark.rotation.y = angle;
     }
   }
   // Paved entrance square, gates, ticket booths and service-side parking.
-  const frontZ = 52.5 - footprint.halfZ - 5;
-  box(29, .15, 14, 0, .04, frontZ, '#acae9e');
+  const frontZ = plan.entrance.z, entryX = plan.entrance.x;
+  box(29, .15, 14, entryX, .04, frontZ, '#acae9e');
   for (const x of [-11, 11]) {
-    box(3.6, 2.6, 3, x, 1.3, frontZ, '#c5c1ac'); box(4.1, .2, 3.5, x, 2.7, frontZ, '#455c62');
-    box(2.3, .9, .05, x, 1.6, frontZ + 1.53, '#3b5961');
+    box(3.6, 2.6, 3, entryX + x, 1.3, frontZ, '#c5c1ac'); box(4.1, .2, 3.5, entryX + x, 2.7, frontZ, '#455c62');
+    box(2.3, .9, .05, entryX + x, 1.6, frontZ + 1.53, '#3b5961');
   }
-  for (const x of [-5, 5]) box(.15, 3.3, .15, x, 1.65, frontZ, '#465859');
-  box(10.2, .7, .25, 0, 3.25, frontZ, '#39535a');
-  for (const x of [-4, -2, 0, 2, 4]) box(.06, 1.2, 1.6, x, .6, frontZ, '#829798');
-  const parkingX = footprint.halfX + 7, parkingZ = 52.5 + footprint.halfZ * .3;
-  box(11, .08, 39, parkingX, .015, parkingZ, '#777c78');
-  for (let i = 0; i < 10; i++) box(4.5, .015, .08, parkingX - 2, .065, parkingZ - 18 + i * 3.8, line);
+  for (const x of [-5, 5]) box(.15, 3.3, .15, entryX + x, 1.65, frontZ, '#465859');
+  box(10.2, .7, .25, entryX, 3.25, frontZ, '#39535a');
+  for (const x of [-4, -2, 0, 2, 4]) box(.06, 1.2, 1.6, entryX + x, .6, frontZ, '#829798');
+  const parkingX = plan.parking.x, parkingZ = plan.parking.z, parkingLength = plan.parking.count * 4.2 + 4;
+  box(11, .08, parkingLength, parkingX, .015, parkingZ, '#777c78');
+  for (let i = 0; i <= plan.parking.count; i++) box(4.5, .015, .08, parkingX - 2, .065, parkingZ - parkingLength / 2 + 2 + i * 4.2, line);
   // Cars have separate cabins, windscreens and wheels, not featureless cuboids.
   const car = (x: number, z: number, color: string, rotate = false) => {
     const group = new THREE.Group();
@@ -77,8 +50,7 @@ export function buildSurroundings(scene: T.Scene, profile: StadiumProfile, footp
     group.updateMatrixWorld(true);
     for (const child of [...group.children]) { child.applyMatrix4(group.matrixWorld); scene.add(child); }
   };
-  for (let i = 0; i < 8; i++) car(parkingX - 1, parkingZ - 16 + i * 4.2, ['#a9b4b5', '#344e64', '#ae5748', '#d6d3bf'][i % 4]!, true);
-  for (let i = 0; i < 8; i++) car(-65 + i * 18, 52.5 - roadZ + 3, ['#e1dbcd', '#566b78', '#935b4f'][i % 3]!, true);
+  for (let i = 0; i < plan.parking.count; i++) car(parkingX - 1, parkingZ - parkingLength / 2 + 4 + i * 4.2, ['#a9b4b5', '#344e64', '#ae5748', '#d6d3bf'][i % 4]!, true);
   // Windows are original procedural textures, reused on the district's facades.
   const wall = document.createElement('canvas'); wall.width = wall.height = 128;
   const c = wall.getContext('2d')!; c.fillStyle = '#d9d5c9'; c.fillRect(0, 0, 128, 128);
@@ -88,28 +60,65 @@ export function buildSurroundings(scene: T.Scene, profile: StadiumProfile, footp
     c.fillStyle = '#8da7ad'; c.fillRect(x + 3, y + 3, 8, 25); c.fillStyle = '#d0d2c7'; c.fillRect(x + 12, y, 2, 32); c.fillRect(x, y + 15, 27, 2);
   }
   const tex = new THREE.CanvasTexture(wall); tex.colorSpace = THREE.SRGBColorSpace;
-  const palette = ['#e6ddd0', '#c2b6a4', '#c9d2c9', '#dfc7ad', '#abbcca'];
+  const palette = plan.palette;
   const facades = palette.map(color => new THREE.MeshStandardMaterial({ color, map: tex, roughness: .88 }));
   const roofs = ['#9c6550', '#6a7170', '#8d7763'];
-  for (const b of surroundingLayout(profile, footprint)) {
-    box(b.width, b.height, b.depth, b.x, b.height / 2, b.z, facades[b.tint]!);
-    if (b.pitched) {
-      const roof = new THREE.Mesh(new THREE.ConeGeometry(1, 1, 4), mat(roofs[b.tint % 3]!));
-      roof.rotation.y = Math.PI / 4; roof.scale.set(b.width * .78, 2, b.depth * .78); roof.position.set(b.x, b.height + 1, b.z); scene.add(roof);
-      box(.35, 2, .4, b.x + b.width * .2, b.height + 1.5, b.z, '#8c8074');
+  for (const b of plan.homes) {
+    if (b.base) box(b.width + 1, b.base, b.depth + 1, b.x, b.base / 2, b.z, '#92958a');
+    box(b.width, b.height, b.depth, b.x, b.base + b.height / 2, b.z, facades[b.tint]!);
+    if (['França', 'Itália', 'Espanha'].includes(profile.country)) for (const side of [-1, 1]) box(.5, 1.5, .08, b.x + side * b.width * .3, b.base + 2, b.z - b.depth / 2 - .08, profile.country === 'França' ? '#536d7a' : '#626a50');
+    if (b.roof !== 'flat') {
+      const roof = new THREE.Mesh(new THREE.ConeGeometry(1, 1, 4), mat(b.roof === 'slate' ? '#59616b' : roofs[b.tint % 3]!));
+      roof.rotation.y = Math.PI / 4; roof.scale.set(b.width * .78, 2, b.depth * .78); roof.position.set(b.x, b.base + b.height + 1, b.z); scene.add(roof);
+      box(.35, 2, .4, b.x + b.width * .2, b.base + b.height + 1.5, b.z, '#8c8074');
     } else {
-      box(b.width + .3, .25, b.depth + .3, b.x, b.height + .1, b.z, '#717d7e');
-      box(2.2, .8, 1.3, b.x + 1, b.height + .6, b.z, '#a0aaa8');
-      for (let floor = 1; floor * 3 < b.height; floor++) box(b.width * .75, .17, 1, b.x, floor * 3, b.z + b.depth / 2 + .35, '#939b97');
+      box(b.width + .3, .25, b.depth + .3, b.x, b.base + b.height + .1, b.z, '#717d7e');
+      box(2.2, .8, 1.3, b.x + 1, b.base + b.height + .6, b.z, '#a0aaa8');
+      for (let floor = 1; floor * 3 < b.height; floor++) box(b.width * .75, .17, 1, b.x, b.base + floor * 3, b.z + b.depth / 2 + .35, '#939b97');
     }
   }
-  // Human-scale street furniture is visible through the open stands.
-  const treeGeo = new THREE.SphereGeometry(1, 8, 6), treeMat = mat('#3e6650');
-  for (let i = -4; i <= 4; i++) for (const sign of [-1, 1]) {
-    const x = i * 22, z = 52.5 + sign * (roadZ - 8);
-    box(.16, 6, .16, x + 4, 3, z, '#606c6a'); box(1.4, .18, .55, x + 4.5, 6, z, '#d0d0b4');
-    box(.3, 3.2, .3, x - 3, 1.6, z, '#77634d');
-    const tree = new THREE.Mesh(treeGeo, treeMat); tree.scale.set(2.1, 2.9, 2.1); tree.position.set(x - 3, 4.6, z); scene.add(tree);
-    if (i % 2 === 0) { box(2.3, .18, .65, x, .65, z, '#88755a'); for (const sx of [-.8, .8]) box(.15, .65, .5, x + sx, .33, z, '#465458'); }
+  const treeGeo = new THREE.SphereGeometry(1, 8, 6), pineGeo = new THREE.ConeGeometry(1, 1, 7), treeMat = mat('#3e6650');
+  for (const t of plan.trees) {
+    if ((plan.kind === 'english-park' || plan.kind === 'rural') && Math.abs(t.x + footprint.halfX + 61) < 27 && Math.abs(t.z - 52.5) < 38) continue;
+    box(.3, 3 * t.scale, .3, t.x, 1.5 * t.scale, t.z, '#77634d');
+    const tree = new THREE.Mesh(t.pine ? pineGeo : treeGeo, treeMat); tree.scale.set(2.2 * t.scale, (t.pine ? 7 : 3) * t.scale, 2.2 * t.scale); tree.position.set(t.x, (t.pine ? 5 : 4.5) * t.scale, t.z); scene.add(tree);
+  }
+  for (const r of plan.roads) {
+    const dx = r.bx - r.ax, dz = r.bz - r.az, length = Math.hypot(dx, dz);
+    for (let along = 18; along < length; along += plan.kind === 'metropolitan' ? 24 : 38) {
+      const x = r.ax + dx / length * along - dz / length * (r.width / 2 + 2), z = 52.5 + r.az + dz / length * along + dx / length * (r.width / 2 + 2);
+      box(.15, 6, .15, x, 3, z, '#606c6a'); box(1.3, .18, .55, x, 6, z, '#c9cbb3');
+    }
+  }
+  if (plan.kind === 'english-park' || plan.kind === 'rural') {
+    const x = -footprint.halfX - 61;
+    box(49, .06, 73, x, .01, 52.5, '#4b8152');
+    for (const dx of [-22, 22]) box(.12, .04, 65, x + dx, .06, 52.5, '#d0dcc4');
+    for (const dz of [-32.5, 0, 32.5]) box(44, .04, .12, x, .06, 52.5 + dz, '#d0dcc4');
+    for (const dz of [-33, 33]) { box(7, .13, .13, x, 2.2, 52.5 + dz, '#d9e0d3'); for (const dx of [-3.5, 3.5]) box(.12, 2.2, .12, x + dx, 1.1, 52.5 + dz, '#d9e0d3'); }
+    box(12, 3, 6, footprint.halfX + 45, 1.5, 52.5 + footprint.halfZ + 12, '#a88c70');
+  } else if (plan.kind === 'rio-neighborhood') {
+    const z = frontZ - 3;
+    box(29, 3.5, .8, 0, 1.75, z, '#dfd3b9');
+    for (const x of [-9, 9]) { box(3, 6, 2.5, x, 3, z, '#d5c6a9'); box(3.4, .3, 2.9, x, 6.1, z, '#b66b50'); }
+    for (const x of [-4, 4]) { box(3, 2.7, .9, x, 1.35, z - .1, '#45575a'); const arch = new THREE.Mesh(new THREE.TorusGeometry(1.55, .24, 5, 20, Math.PI), mat('#eee2c4')); arch.position.set(x, 2.7, z - .6); scene.add(arch); }
+    // Water tanks and small workshops distinguish the compact Brazilian district.
+    for (const b of plan.homes.filter((_, i) => i % 5 === 0)) box(1.5, 1.1, 1.5, b.x, b.height + 1, b.z, '#587e96');
+  } else if (plan.kind === 'santos-blocks') {
+    for (const b of plan.homes.filter(b => b.height > 12)) for (let floor = 1; floor * 3 < b.height; floor++) box(.8, .14, b.depth * .9, b.x + b.width / 2 + .3, floor * 3, b.z, '#c7c9bd');
+    // A narrow cafe strip replaces a monumental forecourt in this residential setting.
+    for (const x of [-18, 18]) { box(6, 3, 4, x, 1.5, frontZ - 4, '#ccb695'); box(7, .18, 2.5, x, 2.8, frontZ - 1, '#417c79'); }
+  } else if (plan.kind === 'basque-valley') {
+    box(1.3, 5, footprint.halfZ * 2 + 35, -footprint.halfX - 47, 2.5, 52.5, '#90958a');
+    for (let step = 0; step < 12; step++) box(5, .25 + step * .35, 1.2, -footprint.halfX - 43, (.25 + step * .35) / 2, 36 + step * 1.2, '#b1b0a2');
+  } else if (plan.kind === 'metropolitan') {
+    box(78, .16, 21, 0, .06, frontZ - 8, '#bbbcb2');
+    for (let i = -4; i <= 4; i++) box(.7, 2, .7, i * 7, 1, frontZ - 14, '#6b7e81');
+    const railZ = 52.5 + footprint.halfZ + 93;
+    box(270, .25, 9, 0, .1, railZ, '#858b88');
+    for (const dz of [-2, 2]) box(270, .14, .15, 0, .3, railZ + dz, '#a5afad');
+    for (let x = -125; x <= 125; x += 3) box(.3, .1, 5, x, .23, railZ, '#655f52');
+    box(35, 1.1, 4, 20, .8, railZ + 7, '#bfc4ba'); box(36, .25, 6, 20, 4, railZ + 7, '#496d75');
+    for (const x of [5, 20, 35]) box(.15, 3, .15, x, 2.5, railZ + 7, '#6a797a');
   }
 }

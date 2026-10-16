@@ -1,3 +1,4 @@
+import { matchCrowd } from '../domain/match/crowd.js';
 import { NATIONAL_TEAMS } from '../data/competitions.js';
 import { loadCareerText, writeCareerText, deleteCareer } from '../persistence/browser-storage.js';
 import { competitionHub, competitionDetail } from './competitions.js';
@@ -67,7 +68,11 @@ function render() {
     const fixture = career.world.fixtures.find(f => f.id === career.preparation?.fixtureId);
     const national = career.world.tournaments.find(t => t.id === fixture?.competitionId)?.level === 'national';
     const homeClub = career.clubs.find(c => c.id === fixture?.home) ?? career.clubs.find(c => c.id === career.contract?.clubId);
-    disposeField = mountField(app.querySelector<HTMLElement>('#field-host')!, { session, fixtureLabel: selection.mode === 'match' ? `${career.preparation?.competition ?? 'Partida'} · ${career.preparation?.opponent ?? ''}` : 'Treino de fundamentos', attributes: career.player.attributes, appearance: { stadium: stadiumFor(homeClub, selection.mode !== 'match'), number: career.shirt.number, training: selection.mode !== 'match', kit: selection.mode === 'match' ? national ? nationalKit(career.player.nationality) : (career.dataPack?.clubs.find(p => p.club.id === career.contract?.clubId)?.kits ?? clubKits.kitsFor(career.contract?.clubId ?? 'vale'))[career.shirt.kitIndex]! : trainingKit },
+    const ground = stadiumFor(homeClub, selection.mode !== 'match');
+    const tournament = career.world.tournaments.find(t => t.id === fixture?.competitionId);
+    const homeKit = national ? nationalKit(career.world.teams.find(t => t.id === fixture?.home)?.country ?? career.player.nationality) : career.dataPack?.clubs.find(p => p.club.id === homeClub?.id)?.kits[0] ?? clubKits.kitsFor(homeClub?.id ?? 'vale')[0];
+    const crowd = selection.mode === 'match' ? matchCrowd(career.world, fixture?.home ?? homeClub?.id ?? '', ground.capacity, homeClub?.reputation ?? 50, career.date, tournament?.level ?? career.contract?.team ?? 'senior', national ? career.world.teams.find(t => t.id === fixture?.home)?.country === career.player.nationality : (fixture?.home ?? homeClub?.id) === career.contract?.clubId) : undefined;
+    disposeField = mountField(app.querySelector<HTMLElement>('#field-host')!, { session, fixtureLabel: selection.mode === 'match' ? `${career.preparation?.competition ?? 'Partida'} · ${career.preparation?.opponent ?? ''}` : 'Treino de fundamentos', attributes: career.player.attributes, appearance: { stadium: ground, crowd, homeColors: { primary: homeKit.shirt, secondary: homeKit.secondary }, number: career.shirt.number, training: selection.mode !== 'match', kit: selection.mode === 'match' ? national ? nationalKit(career.player.nationality) : (career.dataPack?.clubs.find(p => p.club.id === career.contract?.clubId)?.kits ?? clubKits.kitsFor(career.contract?.clubId ?? 'vale'))[career.shirt.kitIndex]! : trainingKit },
       onProgress: next => localStorage.setItem(key, JSON.stringify(next)),
       onComplete: async completed => {
         const command: Command = selection.mode === 'assessment' ? { type: 'assess', performances: assessmentScores(completed) }

@@ -1,3 +1,4 @@
+import type { CrowdProfile } from '../domain/match/crowd.js';
 import { stadiumFor, type StadiumProfile } from '../data/stadiums.js';
 import { paintPixelPlayers, spriteFrame, spriteFacing, SPRITE_SIZE, playerAnimationFrame, type PlayerAnimation } from './pixel-player.js';
 import { OFFICIAL_KITS, officialsColor, type OfficialsChoice } from '../data/official-kits.js';
@@ -19,7 +20,7 @@ export function contactEffects(x: number, y: number) {
   const length = Math.hypot(x, y), scale = length > .95 ? .95 / length : 1;
   return { x: x * scale, y: y * scale, curve: -x * scale, lift: Math.max(0, -y * scale) };
 }
-export interface FieldAppearance { number: number; training: boolean; kit: Kit; stadium: StadiumProfile }
+export interface FieldAppearance { number: number; training: boolean; kit: Kit; stadium: StadiumProfile; crowd?: CrowdProfile | undefined; homeColors?: { primary: string; secondary: string } }
 export const fieldZone = trialZone;
 export class Field3D {
   private renderKey = '';
@@ -44,6 +45,7 @@ export class Field3D {
     const ratio = quality === 'low' ? 1 : quality === 'high' ? Math.min(devicePixelRatio || 1, 2) : Math.min(devicePixelRatio || 1, 1.5);
     this.renderer.setPixelRatio(ratio); this.contactRenderer.setPixelRatio(ratio);
     this.renderer.shadowMap.enabled = quality !== 'low';
+    this.canvas.dataset.supporters = String(this.crowds.reduce((total, crowd) => total + crowd.count, 0));
     this.scene.traverse(object => {
       if (object.name === 'spectator-crowd') object.visible = quality !== 'low';
       if (object instanceof THREE.DirectionalLight && object.castShadow) { const size = quality === 'high' ? 2048 : 1024; if (object.shadow.mapSize.x !== size) { object.shadow.mapSize.set(size, size); object.shadow.map?.dispose(); object.shadow.map = null; } }
@@ -65,6 +67,7 @@ export class Field3D {
   private actors: T.Group[] = [];
   private cones: T.Mesh[] = [];
   private gates: T.Mesh[] = [];
+  private crowds: T.InstancedMesh[] = [];
   private line: T.Line;
   private observer: ResizeObserver;
   private size = '';
@@ -153,7 +156,7 @@ export class Field3D {
     const otherGoal = goal.clone(true); otherGoal.rotation.y = Math.PI; otherGoal.position.z = 105; this.scene.add(otherGoal);
     markings([[-20.16, 105], [-20.16, 88.5], [20.16, 88.5], [20.16, 105]]);
     markings([[-9.16, 105], [-9.16, 99.5], [9.16, 99.5], [9.16, 105]]);
-    buildStadium(this.scene, this.appearance.stadium, { primary: this.appearance.kit.shirt, secondary: this.appearance.kit.secondary });
+    this.crowds = buildStadium(this.scene, this.appearance.stadium, this.appearance.homeColors ?? { primary: this.appearance.kit.shirt, secondary: this.appearance.kit.secondary }, this.appearance.training ? 0 : this.appearance.crowd?.occupancy ?? 0);
     this.scene.traverse(object => { const mesh = object as T.Mesh; if (mesh.material) for (const mat of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) { const map = (mat as T.MeshStandardMaterial).map; if (map && !this.textures.includes(map)) this.textures.push(map); } });
     const boardCanvas = document.createElement('canvas'); boardCanvas.width = 1024; boardCanvas.height = 128; const bc = boardCanvas.getContext('2d')!;
     bc.fillStyle = '#10253d'; bc.fillRect(0, 0, 1024, 128); bc.fillStyle = '#eff7fa'; bc.font = 'bold 47px sans-serif'; bc.fillText('FOOTBALL RISE', 35, 78); bc.fillStyle = '#a8e6c5'; bc.fillText('RISE ACADEMY', 565, 78);
@@ -239,6 +242,7 @@ export class Field3D {
     else if (this.overview) { this.camera.position.set(105, 95, 158); this.camera.lookAt(0, 0, 52.5); }
     else { this.camera.position.set(centre.x + .3, midfield ? 8 : 5.4, centre.z + 9.5); this.camera.lookAt(centre.x, 1.05, Math.max(0, centre.z - (midfield ? 5 : 12))); }
     this.camera.updateMatrixWorld();
+    this.crowds.forEach((crowd, i) => { crowd.position.y = t.outcome === 'goal' && this.appearance.crowd?.homeIsPlayer ? Math.abs(Math.sin(animationTime * 9 + i)) * .16 : 0; });
     if (t.kind === 'technique') {
       this.actor(count++, t.player, '#d9fa6b'); this.ball.position.copy(this.vector(t.ball)); this.ball.position.y = BALL_RADIUS + Math.abs(Math.sin(t.time * 10)) * Math.min(.045, Math.hypot(t.velocity.x, t.velocity.y) / 5000); this.ball.rotation.x = t.travel / 12; this.ball.rotation.z = -t.travel / 24;
       t.gates.forEach((p, i) => { let gate = this.gates[i]; if (!gate) { gate = new THREE.Mesh(new THREE.TorusGeometry(.65, .06, 8, 24), this.material('#d7fa76')); gate.rotation.x = -Math.PI / 2; this.scene.add(gate); this.gates[i] = gate; } gate.visible = i >= t.gate; gate.position.copy(this.vector(p)); gate.position.y = .05; gate.scale.setScalar(i === t.gate ? 1.2 : .8); gate.material = this.material(i === t.gate ? '#7cf5db' : '#718768'); });
