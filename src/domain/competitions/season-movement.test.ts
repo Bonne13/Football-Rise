@@ -1,0 +1,25 @@
+import test from 'node:test';import assert from 'node:assert/strict';import{readFileSync}from'node:fs';
+import{createCareer}from'../../application/career.js';import{parseFootballPack}from'../../data/football-pack.js';import{membershipFor}from'../../data/league-snapshots.js';
+import{createWorld,advanceWorld,standings,aggregate}from'./world.js';import{extraTimeAllowed}from'./extra-time.js';import{nextDivisions}from'./season-movement.js';import{serializeSave,deserializeSave}from'../../persistence/save.js';
+const pack=parseFootballPack(readFileSync('web/data/world-leagues.json','utf8'));const input={name:'Season',nationality:'Brasil',preferredFoot:'right' as const,position:'ST' as const,seed:42};
+function english(){return createCareer(input,{loadYouthClubs:()=>pack.clubs.filter(p=>['league:Inglaterra','league2:Inglaterra'].includes(membershipFor(p.club)?.key??'')).map(p=>p.club)});}
+test('English playoffs finish before rollover, promote two automatic clubs plus winner and preserve membership next year',()=>{
+ const s=english();advanceWorld(s,'2027-06-30');s.date='2027-06-30';const w=s.world,upper=w.tournaments.find(t=>t.key==='league:Inglaterra')!,lower=w.tournaments.find(t=>t.key==='league2:Inglaterra')!,playoff=w.tournaments.find(t=>t.key==='promotion:Inglaterra:2')!;
+ assert.equal(playoff.phase,'complete');const fs=w.fixtures.filter(f=>f.competitionId===playoff.id);assert.equal(fs.length,5);assert.ok(fs.every(f=>f.date<'2027-07-01'));const qualified=standings(w,lower).slice(2,6).map(r=>r.teamId);assert.ok(qualified.includes(playoff.champion!));for(const f of fs.filter(f=>f.round===1)){const legs=fs.filter(x=>x.round===1&&[x.home,x.away].includes(f.home)&&[x.home,x.away].includes(f.away)).sort((a,b)=>a.date.localeCompare(b.date));if(legs[0]!.id===f.id)assert.ok(qualified.indexOf(f.home)>qualified.indexOf(f.away));}
+ const promoted=[...standings(w,lower).slice(0,2).map(r=>r.teamId),playoff.champion!],down=standings(w,upper).slice(-3).map(r=>r.teamId);
+ const next=createWorld(s.clubs,42,'2027-07-01',w),top=next.tournaments.find(t=>t.key===upper.key)!,second=next.tournaments.find(t=>t.key===lower.key)!;assert.equal(top.participants.length,20);assert.equal(second.participants.length,24);assert.ok(promoted.every(id=>top.participants.includes(id)));assert.ok(down.every(id=>second.participants.includes(id)));assert.equal(new Set([...top.participants,...second.participants]).size,44);
+ const kept=createWorld(s.clubs,42,'2028-07-01',next);assert.ok(promoted.every(id=>kept.tournaments.find(t=>t.key===upper.key)!.participants.includes(id)));assert.deepEqual(deserializeSave(serializeSave(s)),s);
+});
+test('Brazil exchanges four clubs with full custom divisions and refuses partial bundled Série B',()=>{
+ const profiles=pack.clubs.filter(p=>['league:Brasil','league2:Brasil'].includes(membershipFor(p.club)?.key??''));const extra=[0,1].map(i=>({...profiles[0]!.club,id:`full-b-${i}`,name:`Clube adicional ${i}`}));const s=createCareer(input,{loadYouthClubs:()=>[...profiles.map(p=>p.club),...extra]});
+ const a=s.world.tournaments.find(t=>t.key==='league:Brasil')!,b=s.world.tournaments.find(t=>t.key==='league2:Brasil')!;a.participants=a.participants.filter(id=>!id.startsWith('full-b'));b.participants.push(...extra.map(c=>c.id));s.world=createWorld(s.clubs,42,s.date,s.world);advanceWorld(s,'2027-06-30');s.date='2027-06-30';
+ const result=nextDivisions(s.clubs,s.world,t=>standings(s.world,t).map(r=>r.teamId));assert.equal(result.moves.filter(m=>m.kind==='promoted').length,4);assert.equal(result.moves.filter(m=>m.kind==='relegated').length,4);
+ const partial=createCareer({...input,dataPack:pack});advanceWorld(partial,'2027-06-30');partial.date='2027-06-30';assert.equal(nextDivisions(partial.clubs,partial.world,t=>standings(partial.world,t).map(r=>r.teamId)).moves.filter(m=>m.from.endsWith(':Brasil')).length,0);
+});
+test('extra time occurs only after a decisive aggregate draw and is absent from legacy editions',()=>{
+ const s=english();advanceWorld(s,'2027-06-30');s.date='2027-06-30';const extra=s.world.fixtures.filter(f=>f.extraTime);assert.ok(extra.length>0);
+ for(const f of extra){const t=s.world.tournaments.find(t=>t.id===f.competitionId)!;assert.equal(extraTimeAllowed(t,f,s.world),true);const [h,a]=aggregate(s.world,f);assert.equal(h-f.extraTime![0],a-f.extraTime![1]);}
+ assert.ok(s.world.stats.some(p=>p.minutes>p.appearances*90));assert.doesNotThrow(()=>serializeSave(s));const bad=structuredClone(s),league=bad.world.fixtures.find(f=>f.stage==='league')!;league.extraTime=[0,0];assert.throws(()=>serializeSave(bad));
+ const old=english();for(const t of old.world.tournaments){t.regulationId=t.regulationId?.replace('continental-v2:','continental-v1:').replace('rules-v3:','rules-v1:').replace(':extra-time-v1','') as string;if(t.regulationId===undefined)delete t.regulationId;}
+ advanceWorld(old,'2027-06-30');old.date='2027-06-30';assert.equal(old.world.fixtures.some(f=>f.extraTime),false);assert.equal(old.world.tournaments.some(t=>t.key.startsWith('promotion:')),false);assert.doesNotThrow(()=>serializeSave(old));
+});

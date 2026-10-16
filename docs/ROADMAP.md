@@ -96,3 +96,7 @@ Atletas em pixel art/2D por escolha do usuário, no estádio 3D existente; unifo
 ### Assistentes e apresentação do VAR
 
 Dois bandeirinhas ligados à linha de impedimento e à participação do receptor; monitor à beira do campo, corrida do árbitro e take da central com VAR/AVAR/operador e seis telas com evidência congelada. Sequência automática para gols/impedimentos jogáveis e repetição pela pausa, sem alterar resultado ou duplicar registro. Protocolo cinematográfico simplificado; revisão disciplinar e demais classes oficiais continuam pendentes.
+
+### Revisão de condução e troca de temporada
+
+Três circuitos distintos, portões físicos numerados, ritmo analógico e aceleração por Shift/dois dedos. Oportunidades de partida usam defensores e corredores, com recuperação real da posse e continuidade da bola para a finalização. Playoffs e acesso/descenso ingleses e trocas Série A/B são executados somente com cadastros completos; o pacote parcial da Série B não inventa participantes. Divisões persistem após a virada. Prorrogação por fase em novos regulamentos; edições antigas preservadas. Vagas continentais oficiais e demais sistemas de acesso/descenso continuam pendentes. Prévia visual permanece separada da publicação do jogo.

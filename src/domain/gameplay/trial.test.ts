@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createTrial, controlTrial, tickTrial, keeperAt, teammateAt, isOffside, type Drill, type Trial } from './trial.js';
+import { createTrial, controlTrial, tickTrial, fieldBody, trialZone, keeperAt, teammateAt, isOffside, type Drill, type Trial } from './trial.js';
 import { assessmentScores, createSession, recordTrial, restoreSession, matchPerformance } from '../../application/drills.js';
 import { createCareer, advanceCareer } from '../../application/career.js';
 function advance(t: Trial, seconds: number) { for (let i = 0; i < Math.ceil(seconds * 20); i++) tickTrial(t, .05); }
@@ -190,4 +190,20 @@ test('sprint accelerates according to pace and loses speed on an obstacle', () =
     advance(t, 18); assert.equal(t.outcome, 'complete'); times.push(t.time);
   }
   assert.ok(times[1]! < times[0]!);
+});
+
+test('sprint trades close ball control for speed and release restores precision',()=>{
+ const close=createTrial('technique',1,42),fast=structuredClone(close);
+ for(const t of [close,fast])controlTrial(t,{type:'steer',direction:{x:0,y:-1}});controlTrial(fast,{type:'sprint',active:true});tickTrial(close,.6);tickTrial(fast,.6);
+ assert.ok(Math.hypot(fast.velocity.x,fast.velocity.y)>Math.hypot(close.velocity.x,close.velocity.y));assert.ok(Math.hypot(fast.ball.x-fast.player.x,fast.ball.y-fast.player.y)>Math.hypot(close.ball.x-close.player.x,close.ball.y-close.player.y));
+ controlTrial(fast,{type:'sprint',active:false});controlTrial(fast,{type:'steer',direction:null});tickTrial(fast,1);assert.ok(Math.hypot(fast.ball.x-fast.player.x,fast.ball.y-fast.player.y)<3);
+});
+test('match carries use opponents instead of training cones, and a defender can recover possession',()=>{
+ const t=createTrial('technique',1,42,100,{technique:50,pace:50},'match');assert.equal(t.cones.length,0);assert.equal(t.gates.length,3);const before=structuredClone(t.defenders);controlTrial(t,{type:'steer',direction:{x:0,y:0}});advance(t,8);assert.notDeepEqual(t.defenders,before);assert.equal(t.outcome,'intercepted');assert.equal(t.referee.signal,'none');
+});
+test('match carry exit is persisted for the next shot and old match sessions remain resumable',()=>{
+ let s=createSession('match',42);assert.deepEqual(s.sequence,['pass','technique','shoot','freekick']);const p=createTrial('pass',1,42);p.resolved=true;p.outcome='received';p.score=90;s=recordTrial(s,p);
+ const carry=createTrial('technique',2,42,100,{technique:80,pace:80},'match');controlTrial(carry,{type:'sprint',active:true});for(const gate of carry.gates){controlTrial(carry,{type:'move',destination:gate});for(let i=0;i<250&&!carry.resolved&&Math.hypot(carry.player.x-gate.x,carry.player.y-gate.y)>3;i++)tickTrial(carry,.025);}assert.equal(carry.outcome,'complete');s=recordTrial(s,carry);s=restoreSession(JSON.stringify(s),createSession('match',42));assert.ok(Math.abs(fieldBody(s.results[1]!.carry!).z-fieldBody(carry.ball,trialZone('technique',carry.layout,carry.context)).z)<1e-9);
+ const legacy={...createSession('match',42),sequence:['pass','shoot','technique','freekick']};assert.deepEqual(restoreSession(JSON.stringify(legacy),createSession('match',42)).sequence,legacy.sequence);
+ assert.throws(()=>restoreSession(JSON.stringify({...s,results:[s.results[0],{...s.results[1],carry:{x:Infinity,y:500}}]}),createSession('match',42)));
 });

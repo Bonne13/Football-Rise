@@ -6,6 +6,7 @@ export type Drill = typeof DRILLS[number];
 export interface Point { x: number; y: number }
 export interface Shot { from: Point; end: Point; curve: number; lift: number; elapsed: number; duration: number; receiver: Point | null; offside: boolean; keeper: number; ball: BallBody; goalLine: GoalLine; decision: GoalDecision | null; offsideSnapshot: OffsideSnapshot | null; stoppedBy: 'keeper' | 'wall' | null }
 export interface Trial {
+  context:'training'|'match'; sprint:boolean; ballTravel:number;
   kind: Drill; attempt: number; layout: number; time: number; started: boolean; resolved: boolean; score: number;
   message: string; outcome: 'goal' | 'save' | 'wide' | 'wall' | 'received' | 'intercepted' | 'offside' | 'complete' | 'timeout' | null;
   origin: Point; aim: Point; target: Point; shot: Shot | null; player: Point; destination: Point | null;
@@ -14,7 +15,7 @@ export interface Trial {
   lane: number; distance: number; obstacles: { distance: number; lane: number; passed: boolean }[];
   mates: Point[]; defenders: Point[]; offsideLine: number; accuracy: number; referee: { position: Point; signal: 'none' | 'goal' | 'offside' | 'no-goal' };
 }
-export type TrialInput = { type: 'kick'; aim: Point; curve: number; lift: number; velocity?: number } | { type: 'move'; destination: Point } | { type: 'lane'; direction: -1 | 1 } | { type: 'steer'; direction: Point | null };
+export type TrialInput = { type: 'kick'; aim: Point; curve: number; lift: number; velocity?: number } | { type: 'move'; destination: Point } | { type: 'lane'; direction: -1 | 1 } | { type: 'steer'; direction: Point | null } | {type:'sprint'; active:boolean};
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
 const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
 export function keeperAt(time: number) { return 440 + Math.sin(time * 1.8) * 135; }
@@ -26,18 +27,18 @@ export function blockedPath(from: Point, to: Point, defenders: Point[], curve: n
   for (let i = 1; i < 60; i++) if (defenders.some(p => distance(ballPath(from, to, i / 60, curve), p) < 35)) return true;
   return false;
 }
-export const trialZone = (kind: Drill, layout: number) => ['shoot', 'freekick'].includes(kind) ? 0 : [35, 28, 42][layout % 3]!;
+export const trialZone = (kind: Drill, layout: number, context:'training'|'match'='training') => kind==='technique'&&context==='match'?8: ['shoot', 'freekick'].includes(kind) ? 0 : [35, 28, 42][layout % 3]!;
 export const fieldBody = (p: Point, zone = 0) => ({ x: (p.x - 440) / (400 / 7.32), y: BALL_RADIUS, z: (p.y - 95) / 50 + zone });
 export function offsideAtPass(receiver: Point, ball: Point, opponents: Point[], zone = 0) {
   return judgeOffside({ id: 'receiver', position: fieldBody(receiver, zone), playableRadius: .12 }, { position: fieldBody(ball, zone), radius: BALL_RADIUS }, opponents.map((p, i) => ({ id: `defender-${i}`, position: fieldBody(p, zone), playableRadius: .12 })));
 }
 export function isOffside(receiver: Point, ball: Point, opponents: Point[]) { return offsideAtPass(receiver, ball, opponents).offside; }
-export function createTrial(kind: Drill, attempt: number, seed: number, accuracy = 100, movement = { technique: 50, pace: 50 }): Trial {
+export function createTrial(kind: Drill, attempt: number, seed: number, accuracy = 100, movement = { technique: 50, pace: 50 }, context:'training'|'match'='training'): Trial {
   requireRule(DRILLS.includes(kind) && Number.isInteger(attempt) && attempt >= 1, 'Fundamento inválido.'); bounded(seed, 0, 0xffffffff); requireRule(Number.isInteger(seed), 'Seed inválida.'); bounded(accuracy, 1, 100);
   bounded(movement.technique, 0, 100); bounded(movement.pace, 0, 100);
   const layout = (seed % 3 + attempt - 1) % 3;
   const side = draw((seed + attempt) >>> 0, 0, 1).value;
-  const trial: Trial = { kind, attempt, layout, time: 0, started: false, resolved: false, score: 0, message: '', outcome: null,
+  const trial: Trial = { context,sprint:false,ballTravel:0,kind, attempt, layout, time: 0, started: false, resolved: false, score: 0, message: '', outcome: null,
     origin: { x: 440, y: kind === 'freekick' ? 1100 : 950 }, aim: { x: 440, y: 65 }, target: { x: side ? 580 : 300, y: 60 },
     shot: null, player: { x: 440, y: 1170 }, destination: null,
     ball: { x: 440, y: 1150 }, velocity: { x: 0, y: 0 }, steering: null, travel: 0, handling: movement.technique, running: movement.pace,
@@ -56,6 +57,12 @@ export function createTrial(kind: Drill, attempt: number, seed: number, accuracy
     trial.mates = trial.mates.map(variant); trial.defenders = trial.defenders.map(variant);
     trial.offsideLine = layout === 2 ? 285 : 250;
     trial.obstacles.forEach((o, i) => { o.lane = (o.lane + layout + i % 2) % 3; o.distance += i % 2 ? layout * 2 : 0; });
+  }
+  if(kind==='technique'&&layout===1){trial.gates=[{x:620,y:1020},{x:360,y:930},{x:360,y:700},{x:600,y:580},{x:340,y:330}];trial.cones=[{x:720,y:1010},{x:270,y:920},{x:450,y:700},{x:690,y:560}];}
+  if(kind==='technique'&&layout===2){trial.gates=[{x:220,y:1020},{x:540,y:900},{x:310,y:700},{x:620,y:520},{x:440,y:270}];trial.cones=[{x:120,y:1020},{x:640,y:900},{x:210,y:700},{x:720,y:520}];}
+  if(kind==='technique'&&context==='match'){
+    const x=[440,580,290][layout]!;trial.player={x,y:1140};trial.gates=[{x,y:940},{x:x+(layout===1?-150:140),y:700},{x:440,y:440}];trial.cones=[];
+    trial.defenders=[{x:x+(layout===1?-180:180),y:920},{x:440+(layout===2?160:-150),y:620}];trial.mates=[{x:180,y:580},{x:710,y:390}];
   }
   if (kind === 'pass') trial.defenders.push({ x: 790, y: 130 });
   const zone = trialZone(kind, layout);
@@ -77,6 +84,7 @@ export function strikeVelocity(attributes: Attributes, kind: Drill, charge: numb
 /** Input mutates only a private copy owned by the running field adapter. */
 export function controlTrial(t: Trial, input: TrialInput) {
   if (t.resolved || t.shot) return;
+  if(input.type==='sprint'){if(t.kind==='technique'){requireRule(typeof input.active==='boolean','Ritmo inválido.');t.sprint=input.active;}return;}
   if (input.type === 'lane') { if (t.kind !== 'speed') return; t.started = true; t.lane = clamp(t.lane + input.direction, 0, 2); return; }
   if (input.type === 'steer') {
     if (t.kind !== 'technique') return;
@@ -148,22 +156,28 @@ function step(t: Trial, dt: number) {
   }
   if (t.kind === 'technique') {
     const dx = t.destination ? t.destination.x - t.player.x : 0, dy = t.destination ? t.destination.y - t.player.y : 0, d = Math.hypot(dx, dy);
-    const speed = 205 + t.running * .7;
+    const speed = (205 + t.running * .7)*(t.sprint?1.3:1);
     const direction = t.steering ?? (d > 2 ? { x: dx / d * Math.min(1, d / 45), y: dy / d * Math.min(1, d / 45) } : { x: 0, y: 0 });
-    const blend = 1 - Math.exp(-(7 + t.handling * .08) * dt);
+    const blend = 1 - Math.exp(-(7 + t.handling * .08)*(t.sprint?.75:1) * dt);
     t.velocity.x += (direction.x * speed - t.velocity.x) * blend;
     t.velocity.y += (direction.y * speed - t.velocity.y) * blend;
     const previous = { ...t.player };
     t.player.x = clamp(t.player.x + t.velocity.x * dt, 20, 860); t.player.y = clamp(t.player.y + t.velocity.y * dt, 100, 1290);
     t.travel += distance(previous, t.player);
-    const moving = Math.hypot(t.velocity.x, t.velocity.y), reach = 12 + (1 - t.handling / 100) * 9 + (Math.sin(t.travel / 18) + 1) * 3;
+    const previousBall={...t.ball};
+    const moving = Math.hypot(t.velocity.x, t.velocity.y), reach = (t.sprint?10:0) + 12 + (1 - t.handling / 100) * 9 + (Math.sin(t.travel / 18) + 1) * 3;
     const ballTarget = moving > 3 ? { x: t.player.x + t.velocity.x / moving * reach, y: t.player.y + t.velocity.y / moving * reach } : t.player;
     const touch = 1 - Math.exp(-(10 + t.handling * .12) * dt);
     t.ball.x = clamp(t.ball.x + (ballTarget.x - t.ball.x) * touch, 10, 870); t.ball.y = clamp(t.ball.y + (ballTarget.y - t.ball.y) * touch, 90, 1300);
+    t.ballTravel+=distance(previousBall,t.ball);
+    if(t.context==='match'){
+      for(const defender of t.defenders){const dx=t.ball.x-defender.x,dy=t.ball.y-defender.y,d=Math.hypot(dx,dy);if(d<340&&d>1){const step=Math.min(d,(78+t.running*.15)*dt);defender.x+=dx/d*step;defender.y+=dy/d*step;}}
+      if(t.time>1.5&&t.defenders.some(p=>distance(p,t.ball)<25)){t.collisions++;finish(t,t.gate/t.gates.length*60,'O defensor recuperou a bola. Mude o ritmo e proteja a posse.','intercepted');return;}
+    }
     const touching = t.cones.some(p => distance(p, t.player) < 32 || distance(p, t.ball) < 30);
     if (touching && !t.touching) { t.collisions++; t.velocity.x *= .45; t.velocity.y *= .45; } t.touching = touching;
     const gate = t.gates[t.gate]; if (gate && distance(gate, t.ball) < 40 && distance(gate, t.player) < 55) t.gate++;
-    if (t.gate === t.gates.length) { finish(t, 100 - t.collisions * 15 - Math.max(0, t.time - 12) * 2, 'Circuito concluído! Boa condução.', 'complete'); return; }
+    if (t.gate === t.gates.length) { finish(t, 100 - t.collisions * 15 - Math.max(0, t.time - 12) * 2, t.context==='match'?'Linha defensiva superada! Ataque preparado para finalizar.':'Circuito concluído! Boa condução.', 'complete'); return; }
   }
   const limit = t.kind === 'technique' ? 22 : t.kind === 'speed' ? 18 : 15;
   if (t.time >= limit) finish(t, t.kind === 'technique' ? Math.max(0, t.gate * 15 - t.collisions * 15) : 0, 'Tempo encerrado. Tente de novo na próxima tentativa.', 'timeout');

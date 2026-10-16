@@ -33,3 +33,7 @@ body.field-screen{overflow:hidden;overscroll-behavior:none}body.field-screen>hea
 #var-overlay[data-room=true]{background:#091722}#var-room{max-height:calc(100dvh - 225px)}
 
 .field-coach #drill-hint{display:block;font-size:11px;line-height:1.5;color:#c1d3de;margin-top:3px}.field-coach #crowd-status:not([hidden]){display:block;font-size:10px;line-height:1.45;color:#b8ebcf;margin-top:8px;padding-top:7px;border-top:1px solid #96c3b333}
+
+.dribble-pace{position:absolute;right:20px;bottom:calc(190px + env(safe-area-inset-bottom,0px));z-index:5;width:108px;min-height:72px;border-radius:22px;background:#123d49e8;border:2px solid #8ae3cb;color:#effff8;font-size:12px;touch-action:none;user-select:none;-webkit-user-select:none;box-shadow:0 8px 24px #001a2766}.dribble-pace small{display:block;font-size:9px;margin-top:5px;color:#a7d6cc}.dribble-pace[aria-pressed=true]{background:#b7ee82;color:#14322a;border-color:#e3ffc3;transform:scale(.97)}.dribble-pace[hidden]{display:none}.field-stage[data-view=var] .dribble-pace{display:none}
+.dribble-pace{transition:transform .08s,border-color .08s}.dribble-pace[aria-pressed=true] small{color:#254e39}@media(min-width:900px){.field-screen .field-live{bottom:132px;right:24px;max-width:calc(100% - 48px);justify-content:flex-start}}
+@media(min-width:900px){.field-screen .ball-control{left:24px;right:auto;bottom:132px;width:320px;transform:none}}

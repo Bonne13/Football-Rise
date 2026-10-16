@@ -1,3 +1,5 @@
+import { nextDivisions, playoffPath, promotionKey } from './season-movement.js';
+import { aggregateRegulation, extraTimeAllowed } from './extra-time.js';
 import { initializeSpecial, progressSpecial, specialStandings, specialOutcome } from './special-formats.js';
 import { regulationFor, regulationById, REAL_CUP_NAMES } from '../../data/competition-regulations.js';
 import { ASSOCIATIONS, associationFor } from '../../data/associations.js';
@@ -7,7 +9,7 @@ import { BRAZIL_STATES, CUP_SPECS, EUROPE, SOUTH_AMERICA, NORTH_AMERICA, CENTRAL
 import type { CareerState, Club, Performance } from '../career/state.js';
 import { calculateOverall } from '../player/player.js';
 export interface Team { id: string; name: string; country: string; strength: number; national: boolean }
-export interface Fixture { id: string; competitionId: string; round: number; stage: string; group: number; date: string; home: string; away: string; homeGoals: number | null; awayGoals: number | null; penalties: [number, number] | null }
+export interface Fixture { id: string; competitionId: string; round: number; stage: string; group: number; date: string; home: string; away: string; homeGoals: number | null; awayGoals: number | null; penalties: [number, number] | null; extraTime?: [number,number] }
 export interface Tournament { id: string; key: string; name: string; season: number; level: 'youth' | 'senior' | 'national'; format: 'league' | 'cup' | 'league-knockout' | 'groups'; phase: 'league' | 'groups' | 'playoff' | 'knockout' | 'complete' | 'unavailable'; participants: string[]; groups: string[][]; waiting: string[]; champion: string | null; notice: string; regulationId?: string }
 export interface PlayerStats { playerId: string; name: string; teamId: string; competitionId: string; position: string; birthDate: string | null; appearances: number; minutes: number; goals: number; assists: number; ratingTotal: number; cleanSheets: number }
 export interface Award { id: string; season: number; competitionId: string; kind: 'champion' | 'top-scorer' | 'best-player' | 'young-player' | 'goalkeeper' | 'team-of-tournament' | 'season-player'; name: string; playerId: string | null; playerName: string; teamId: string; value: number }
@@ -82,23 +84,24 @@ function roundRobin(w: CompetitionWorld, t: Tournament, ids: string[], firstDate
   const schedule = Array.from({length:legs},(_,leg)=>base.map(f=>({home:leg%2?f.away:f.home,away:leg%2?f.home:f.away,round:f.round+leg*(rotation.length-1)}))).flat();
   // Orient the even-degree league-phase graph along Euler circuits: exactly 4/4
   // (or 3/3) home/away games, preserving each round's distinct opponents.
-  if(t.regulationId?.startsWith('continental-v1:') && stage==='league' && rounds && ids.length===36){
+  if(aggregateRegulation(t) && stage==='league' && rounds && ids.length===36){
     const edges=schedule.filter(f=>f.round<rounds), adjacent=new Map(ids.map(id=>[id,[] as number[]]));
     edges.forEach((f,i)=>{adjacent.get(f.home)!.push(i);adjacent.get(f.away)!.push(i);});
     const used=new Set<number>();
     for(const start of ids){const stack=[start];while(stack.length){const node=stack.at(-1)!;const list=adjacent.get(node)!;while(list.length&&used.has(list.at(-1)!))list.pop();const index=list.pop();if(index===undefined){stack.pop();continue;}used.add(index);const edge=edges[index]!,next=edge.home===node?edge.away:edge.home;edge.home=node;edge.away=next;stack.push(next);}}
   }
-  for (const f of schedule) if (rounds === undefined || f.round < rounds) fixture(w, t, f.home, f.away, addDays(firstDate, f.round * (t.key.includes('champions') || t.key === 'europa' || t.key === 'conference' ? 14 : 7)), f.round + 1, stage, group);
+  for (const f of schedule) if (rounds === undefined || f.round < rounds) fixture(w, t, f.home, f.away, addDays(firstDate, f.round * (t.key.includes('champions') || t.key === 'europa' || t.key === 'conference' ? 14 : t.regulationId?.startsWith('rules-v3:')&&/^league[234]:Inglaterra$/.test(t.key)?6:7)), f.round + 1, stage, group);
 }
 export function isTwoLegged(t: Tournament, size: number): boolean {
-  return !!t.regulationId?.startsWith('continental-v1:') && (size > 2 || ['central-american','caribbean'].includes(t.key)) && ['champions','europa','conference','libertadores','sudamericana','concacaf-champions','central-american','caribbean'].includes(t.key);
+  return !!aggregateRegulation(t) && (size > 2 || ['central-american','caribbean'].includes(t.key)) && (['champions','europa','conference','libertadores','sudamericana','concacaf-champions','central-american','caribbean'].includes(t.key)||t.key.startsWith('promotion:'));
 }
 function knockout(w: CompetitionWorld, t: Tournament, ids: string[], date: string, round: number, stage = 'knockout') {
   const size = 2 ** Math.ceil(Math.log2(ids.length)), byes = size - ids.length;
   t.waiting = ids.slice(0, byes);
   const paired = ids.slice(byes);
   for (let i = 0; i < paired.length; i += 2) {
-    const home=paired[i]!,away=paired[paired.length-1-i]!;
+    const promotion=t.key.startsWith('promotion:')&&ids.length>2;
+    const home=promotion?paired[Math.max(i,paired.length-1-i)]!:paired[i]!,away=promotion?paired[Math.min(i,paired.length-1-i)]!:paired[paired.length-1-i]!;
     fixture(w,t,home,away,date,round,stage);
     if(isTwoLegged(t,ids.length))fixture(w,t,away,home,addDays(date,7),round,stage);
   }
@@ -109,8 +112,9 @@ function addTournament(w: CompetitionWorld, key: string, name: string, ids: stri
   const rule = level==='senior' ? regulationFor(key) : undefined;
   if(rule) { t.regulationId=rule.id; t.name=rule.name; t.notice=rule.engine==='reference-only'?'Formato especial catalogado; execução ainda simplificada. Consulte as regras de referência abaixo.':'Formato de referência aplicado ao calendário. Datas e participantes são simulados; regulamento 2026/27 não conferido.'; }
   if(['champions','europa','conference','libertadores','sudamericana','concacaf-champions','central-american','caribbean','world-cup'].includes(key)) {
-    t.regulationId=`continental-v1:${key}`; t.notice='Formato principal de referência aplicado. Participantes, sorteio, vagas e datas simulados; fases preliminares e critérios finais não reproduzidos integralmente.';
+    t.regulationId=`continental-v2:${key}`; t.notice='Formato principal de referência aplicado. Participantes, sorteio, vagas e datas simulados; fases preliminares e critérios finais não reproduzidos integralmente.';
   }
+  if(key.startsWith('promotion:')){t.regulationId=`promotion-v1:${key}`;t.notice='Playoffs de acesso: quatro clubes; semifinais em ida e volta, final única; empate decisivo tem prorrogação e pênaltis.';}
   w.tournaments.push(t);
   if(initializeSpecial(w,t,date,(home,away,when,round,stage,group)=>fixture(w,t,home,away,when,round,stage,group)))return;
   if (ids.length < 2) { t.notice = 'Clubes/seleções insuficientes no pacote para realizar esta edição.'; return; }
@@ -125,6 +129,9 @@ function addTournament(w: CompetitionWorld, key: string, name: string, ids: stri
 export function createWorld(clubs: readonly Club[], seed: number, date: string, previous?: CompetitionWorld, protagonistId = `player-${seed}`): CompetitionWorld {
   const season = seasonOn(date);
   const w: CompetitionWorld = { version: 1, protagonistId, season, rng: seed >>> 0, lastDate: date, teams: clubs.map(c => ({ id: c.id, name: c.name, country: c.country, strength: c.squadOverall, national: false })), tournaments: [], fixtures: [], stats: [], awards: structuredClone(previous?.awards ?? []), history: structuredClone(previous?.history ?? []) };
+  const {allocations}=nextDivisions(clubs,previous,t=>standings(previous!,t).map(r=>r.teamId));
+  const divisionOf=(c:Club)=>allocations.get(c.id)??`league:${c.country}`;
+  const tierOf=(c:Club)=>Number(/^league(\d*):/.exec(divisionOf(c))?.[1]||1);
   const countries = [...new Set([...ASSOCIATIONS.map(a => a.country), ...clubs.map(c => c.country)])].sort();
   const previousRank = new Map<string, number>();
   for (const t of previous?.tournaments ?? []) if (t.key.startsWith('league:')) standings(previous!, t).forEach((row, i) => previousRank.set(row.teamId, i));
@@ -132,7 +139,7 @@ export function createWorld(clubs: readonly Club[], seed: number, date: string, 
   for (const country of countries) {
     const association = associationFor(country);
     const domesticKey = `league:${country}`;
-    const ids = ranked.filter(c => (membershipFor(c)?.key ?? `league:${c.country}`) === domesticKey).map(c => c.id);
+    const ids = ranked.filter(c => divisionOf(c) === domesticKey).map(c => c.id);
     if (!association || association.leagueName) addTournament(w, domesticKey, association?.leagueName ?? `Liga nacional · ${country}`, ids, 'league', 'senior', startDate(season, 8, 8));
     const domesticRule=regulationFor(domesticKey);
     if(domesticRule && ['argentine-cups','colombian-cups','mexican-liguilla'].includes(domesticRule.engine)){
@@ -148,7 +155,7 @@ export function createWorld(clubs: readonly Club[], seed: number, date: string, 
     if(cupName)addTournament(w,`cup:${country}`,cupName,cupIds,'cup','senior',startDate(season,10,7));
   }
   for (const snapshot of LEAGUE_SNAPSHOTS) if (snapshot.division > 1) {
-    const ids = ranked.filter(c => membershipFor(c)?.key === snapshot.key).map(c => c.id);
+    const ids = ranked.filter(c => divisionOf(c) === snapshot.key).map(c => c.id);
     addTournament(w, snapshot.key, snapshot.name.replace(/\s20\d{2}(?:\/\d{2,4})?$/, ''), ids, 'league', 'senior', startDate(season, 8, 9));
   }
   for (const country of countries) {
@@ -160,7 +167,7 @@ export function createWorld(clubs: readonly Club[], seed: number, date: string, 
     if (snapshot && t.participants.length) t.notice += ` Participantes de referência: ${snapshot.season}; ${t.participants.length}/${regulationFor(t.key)?.expected ?? snapshot.clubIds.length} clubes de referência; cadastro pode ser parcial e não confirma a edição 2026/27.`;
   }
   for (const [state, meta] of Object.entries(BRAZIL_STATES)) addTournament(w, `state:${state}`, `Campeonato ${meta.name}`, ranked.filter(c => c.country === 'Brasil' && brazilState(c.name) === state).map(c => c.id), 'cup', 'senior', startDate(season, 1, 10));
-  const european = ranked.filter(c => EUROPE.includes(c.country) && associationFor(c.country)?.continentalEligible !== false && (membershipFor(c)?.division ?? 1) === 1); const used = new Set<string>();
+  const european = ranked.filter(c => EUROPE.includes(c.country) && associationFor(c.country)?.continentalEligible !== false && tierOf(c) === 1 && !divisionOf(c).startsWith('unclassified:')); const used = new Set<string>();
   for (const spec of CUP_SPECS.filter(c => ['champions', 'europa', 'conference'].includes(c.key))) {
     // Country quotas first; vacancies then filled from remaining eligible clubs. No overlapping berths.
     const chosen: string[] = [];
@@ -177,7 +184,7 @@ export function createWorld(clubs: readonly Club[], seed: number, date: string, 
     const ids = pool.slice(0,take); ids.forEach(id => used.add(id));
     addTournament(w,key,spec.name,ids,spec.format,'senior',startDate(season,spec.startMonth,spec.startDay),spec.rounds);
   };
-  const topTier = ranked.filter(c => (membershipFor(c)?.division ?? 1) === 1);
+  const topTier = ranked.filter(c => tierOf(c) === 1 && !divisionOf(c).startsWith('unclassified:'));
   const south = topTier.filter(c => SOUTH_AMERICA.includes(c.country)), southUsed = new Set<string>();
   continental('libertadores',south,32,southUsed); continental('sudamericana',south,32,southUsed);
   const north = topTier.filter(c => NORTH_AMERICA.includes(c.country));
@@ -202,7 +209,7 @@ export function aggregate(w:CompetitionWorld,f:Fixture):[number,number]{
   return tieMatches(w,f).reduce<[number,number]>((sum,x)=>[sum[0]+(x.home===f.home?x.homeGoals??0:x.awayGoals??0),sum[1]+(x.home===f.home?x.awayGoals??0:x.homeGoals??0)],[0,0]);
 }
 function tieWinners(w:CompetitionWorld,t:Tournament,matches:Fixture[]):string[]{
-  if(!t.regulationId?.startsWith('continental-v1:'))return matches.map(winner);
+  if(!aggregateRegulation(t))return matches.map(winner);
   const seen=new Set<string>(), winners:string[]=[];
   for(const f of matches){if(seen.has(f.id))continue;const legs=tieMatches(w,f);legs.forEach(x=>seen.add(x.id));const last=legs.at(-1)!;const [h,a]=aggregate(w,last);winners.push(h===a?(last.penalties![0]>last.penalties![1]?last.home:last.away):h>a?last.home:last.away);}
   return winners;
@@ -229,6 +236,10 @@ function awardTournament(w: CompetitionWorld, t: Tournament) {
     for (const p of best.filter(p => (positions as readonly string[]).includes(p.position)).slice(0, places)) grant(w, t, 'team-of-tournament', `Seleção · ${t.name}`, p, p.teamId, Math.round(score(p) * 100) / 100);
   }
 }
+function leagueFinished(w:CompetitionWorld,t:Tournament,date:string){
+ const path=playoffPath(w,t);if(!path||w.tournaments.some(p=>p.key===promotionKey(path.country,path.lower)))return;
+ addTournament(w,promotionKey(path.country,path.lower),`Playoffs de acesso · ${t.name}`,standings(w,t).slice(path.automatic,path.automatic+4).map(r=>r.teamId),'cup','senior',addDays(date,4));
+}
 function progress(w: CompetitionWorld, t: Tournament) {
   const before=t.phase;
   if(progressSpecial(w,t,(home,away,date,round,stage,group)=>fixture(w,t,home,away,date,round,stage,group))){if(before!=='complete'&&t.phase==='complete')awardTournament(w,t);return;}
@@ -242,7 +253,7 @@ function progress(w: CompetitionWorld, t: Tournament) {
       const date=addDays(current.reduce((max,f)=>f.date>max?f.date:max,current[0]!.date),7);
       t.groups.forEach((ids,i)=>roundRobin(w,t,ids,date,'groups',undefined,i,rule.engine==='austrian-split'));return;
     }
-    t.phase = 'complete'; t.champion = standings(w,t,t.groups.length?0:undefined)[0]!.teamId; awardTournament(w, t); return; }
+    t.phase = 'complete'; t.champion = standings(w,t,t.groups.length?0:undefined)[0]!.teamId; awardTournament(w,t);leagueFinished(w,t,current.reduce((max,f)=>f.date>max?f.date:max,current[0]!.date)); return; }
   let qualified: string[];
   if (t.phase === 'league') {
     const ranked = standings(w, t).map(r => r.teamId);
@@ -286,18 +297,23 @@ export function advanceWorld(s: CareerState, through: string, played?: { fixture
     const f = pending[cursor++]; if (!f) break;
     const t = w.tournaments.find(t => t.id === f.competitionId)!;
     const home = teamsIndex.get(f.home)!, away = teamsIndex.get(f.away)!;
-    f.homeGoals = Math.max(0, Math.min(5, random(0, 3) + Math.round((home.strength - away.strength + (t.regulationId==='rules-v2:league:Argentina'&&f.stage==='final'?0:4)) / 25)));
+    const neutralFinal=t.regulationId?.startsWith('rules-v2:league:Argentina')&&f.stage==='final'||t.key.startsWith('promotion:')&&w.fixtures.filter(x=>x.competitionId===t.id&&x.round===f.round).length===1;
+    f.homeGoals = Math.max(0, Math.min(5, random(0, 3) + Math.round((home.strength - away.strength + (neutralFinal?0:4)) / 25)));
     f.awayGoals = Math.max(0, Math.min(5, random(0, 3) + Math.round((away.strength - home.strength) / 25)));
     const controlled = played && played.fixtureId === f.id ? played : null;
     const playerTeam = t.level === 'national' ? `nation:${s.player.nationality}` : s.contract?.clubId;
     if (controlled) { requireRule(playerTeam === f.home || playerTeam === f.away, 'Atleta fora desta partida.'); if (playerTeam === f.home) f.homeGoals += controlled!.performance.goals + controlled!.performance.assists; else f.awayGoals += controlled!.performance.goals + controlled!.performance.assists; }
-    const special=specialOutcome(w,t,f);
-    if(special?.penalties)f.penalties=random(0,1)?[5,4]:[4,5];
-    else if (!special && ['knockout','playoff'].includes(f.stage)) {
-      const legs=t.regulationId?.startsWith('continental-v1:')?tieMatches(w,f):[f];
-      const [h,a]=t.regulationId?.startsWith('continental-v1:')?aggregate(w,f):[f.homeGoals,f.awayGoals];
-      if(legs.at(-1)!.id===f.id && h===a)f.penalties=random(0,1)?[5,4]:[4,5];
+    const needsPenalties=()=>{
+      const special=specialOutcome(w,t,f);if(special)return special.penalties;
+      if(!['knockout','playoff'].includes(f.stage))return false;
+      const legs=aggregateRegulation(t)?tieMatches(w,f):[f], [h,a]=aggregateRegulation(t)?aggregate(w,f):[f.homeGoals,f.awayGoals];
+      return legs.at(-1)!.id===f.id&&h===a;
+    };
+    if(needsPenalties()&&extraTimeAllowed(t,f,w)){
+      const extra:[number,number]=[random(0,1),random(0,1)];f.extraTime=extra;f.homeGoals+=extra[0];f.awayGoals+=extra[1];
     }
+    if(needsPenalties())f.penalties=random(0,1)?[5,4]:[4,5];
+
     for (const team of [home, away]) {
       let goals = team.id === home.id ? f.homeGoals : f.awayGoals;
       const conceded = team.id === home.id ? f.awayGoals : f.homeGoals;
@@ -310,7 +326,7 @@ export function advanceWorld(s: CareerState, through: string, played?: { fixture
       const roster = real.length ? [real.find(p => p.position === 'GK'), ...real.filter(p => ['DF', 'CB', 'FB'].includes(p.position)).slice(0, 4), ...real.filter(p => ['MF', 'CM', 'AM', 'DM'].includes(p.position)).slice(0, 3), ...real.filter(p => ['FW', 'ST', 'WG'].includes(p.position)).slice(0, 3)].filter((p): p is typeof real[number] => !!p).map(p => ({ id: p.id, name: p.name, position: p.position })) : Array.from({ length: 11 }, (_, i) => ({ id: `sim:${team.id}:${t.level}:${i}`, name: `Atleta simulado ${i + 1} · ${team.name}`, position: i === 0 ? 'GK' : i < 5 ? 'DF' : i < 8 ? 'MF' : 'FW' }));
       const goalScorers = Array.from({ length: goals }, () => random(roster.length > 1 ? 1 : 0, roster.length - 1));
       const assistScorers = Array.from({ length: Math.max(0, goals - (controlled && playerTeam === team.id ? controlled!.performance.assists : 0)) }, (_, i) => { const choices = roster.map((_, j) => j).filter(j => j !== goalScorers[i]); return choices.length ? choices[random(0, choices.length - 1)]! : -1; });
-      roster.forEach((npc, i) => { const p = stat(w, statsIndex, { playerId: `npc:${npc.id}`, name: npc.name, teamId: team.id, competitionId: t.id, position: npc.position, birthDate: t.level === 'youth' ? `${w.season - 17}-01-01` : null }); p.appearances++; p.minutes += 90; p.goals += goalScorers.filter(g => g === i).length; p.assists += assistScorers.filter(g => g === i).length; p.ratingTotal += (random(50, 80) + (goalScorers.includes(i) ? 10 : 0)) / 10; if (!conceded && npc.position === 'GK') p.cleanSheets++; });
+      roster.forEach((npc, i) => { const p = stat(w, statsIndex, { playerId: `npc:${npc.id}`, name: npc.name, teamId: team.id, competitionId: t.id, position: npc.position, birthDate: t.level === 'youth' ? `${w.season - 17}-01-01` : null }); p.appearances++; p.minutes += f.extraTime?120:90; p.goals += goalScorers.filter(g => g === i).length; p.assists += assistScorers.filter(g => g === i).length; p.ratingTotal += (random(50, 80) + (goalScorers.includes(i) ? 10 : 0)) / 10; if (!conceded && npc.position === 'GK') p.cleanSheets++; });
     }
     const countBefore = w.fixtures.length; w.lastDate = f.date; progress(w, t);
     if (w.fixtures.length !== countBefore) { pending = [...pending.slice(cursor), ...w.fixtures.slice(countBefore).filter(next => next.date <= through)].sort((a, b) => compare(a.date, b.date) || compare(a.id, b.id)); cursor = 0; }
@@ -325,6 +341,8 @@ export function advanceWorld(s: CareerState, through: string, played?: { fixture
     const best = [...candidates.values()].filter(p => p.appearances >= 10 && p.minutes >= 300).sort((a, b) => score(b) - score(a) || compare(a.id, b.id))[0];
     if (best) old.awards.push({ id: `${old.season}:season:season-player:${best.id}`, season: old.season, competitionId: `${old.season}:season`, kind: 'season-player', name: 'Jogador da temporada · mundo simulado', playerId: best.id, playerName: best.name, teamId: best.teamId, value: Math.round(score(best) * 100) / 100 });
     old.history.push({ season: old.season, champions: old.tournaments.filter(t => t.champion).map(t => ({ competition: t.name, team: old.teams.find(team => team.id === t.champion)!.name })) });
+    const move=nextDivisions(s.clubs,old,t=>standings(old,t).map(r=>r.teamId)).moves.find(m=>m.clubId===s.contract?.clubId);
+    if(move)s.history.push(`${move.kind==='promoted'?'Acesso':'Rebaixamento'} do principal: ${s.clubs.find(c=>c.id===move.clubId)!.name} mudou de divisão na temporada ${seasonOn(through)}.`);
     s.world = createWorld(s.clubs, old.rng, through, old, old.protagonistId);
   }
 }

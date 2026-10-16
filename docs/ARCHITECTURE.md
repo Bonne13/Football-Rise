@@ -276,3 +276,9 @@ As novas edições podem persistir `Tournament.regulationId`, um ID de regras im
 
 
 Os seis formatos especiais usam IDs `rules-v2:*` e um controlador próprio (`special-formats.ts`) para calendário, classificação, critérios de decisão e transições. Não há regras de qualificação na UI. Os formatos v1 permanecem imutáveis para saves antigos. Apertura/Clausura/Finalización são competições independentes; fases e vencedores são derivados dos jogos persistidos, sem um estado paralelo que possa divergir do save. Melhor de três só agenda o terceiro jogo se necessário. O importador local de confrontos exige a revisão CC0 fixada e valida a distribuição de confrontos por zona/conferência.
+
+### Continuidade de temporada e condução
+
+`season-movement.ts` calcula a divisão da próxima temporada a partir dos participantes persistidos e da classificação encerrada. Playoffs ingleses são competições próprias, com resultados, agregado e campeão. Snapshots importados permanecem históricos. `extra-time.ts` seleciona as fases com prorrogação; IDs novos preservam o comportamento das edições anteriores e `Fixture.extraTime` é um campo opcional validado.
+
+Treinos e partidas compartilham a física determinística de condução, mas usam contextos distintos: circuito com cones no treino e corredores com pressão adversária na partida. A saída física da bola pode ser persistida no resultado da sessão para posicionar a finalização seguinte. Sessões antigas conservam sua sequência. Interface captura direcional/aceleração, desenha balizas ou adversários e anima por distância; recuperação de posse e pontuação ficam no domínio. Ver `docs/DRIBBLING.md`.

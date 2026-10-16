@@ -63,10 +63,11 @@ export class Field3D {
   private contactBall: T.Mesh;
   private contactMark: T.Mesh;
   private aimLine: T.Line;
+  private dribbleGuide:T.Line;
   private trail: T.Line;
   private actors: T.Group[] = [];
   private cones: T.Mesh[] = [];
-  private gates: T.Mesh[] = [];
+  private gates: T.Group[] = [];
   private crowds: T.InstancedMesh[] = [];
   private line: T.Line;
   private observer: ResizeObserver;
@@ -117,6 +118,7 @@ export class Field3D {
     this.contactBall = new THREE.Mesh(new THREE.SphereGeometry(.9, 32, 24), ballMaterial); this.contactScene.add(this.contactBall);
     this.contactMark = new THREE.Mesh(new THREE.SphereGeometry(.055, 12, 8), new THREE.MeshBasicMaterial({ color: '#ff744c', depthTest: false })); this.contactMark.renderOrder = 5; this.contactScene.add(this.contactMark); this.setContact(0, 0);
     this.aimLine = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineDashedMaterial({ color: '#e0ff87', dashSize: .22, gapSize: .16, depthTest: false })); this.aimLine.renderOrder = 4; this.scene.add(this.aimLine);
+    this.dribbleGuide=new THREE.Line(new THREE.BufferGeometry(),new THREE.LineDashedMaterial({color:'#76ddc7',dashSize:.18,gapSize:.28,transparent:true,opacity:.65}));this.scene.add(this.dribbleGuide);
     this.trail = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: '#efffea', transparent: true, opacity: .65 })); this.scene.add(this.trail);
     this.line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-34, .04, 0), new THREE.Vector3(34, .04, 0)]), new THREE.LineBasicMaterial({ color: '#ff963b' })); this.scene.add(this.line);
     this.observer = new ResizeObserver(() => this.resize()); this.observer.observe(canvas); this.observer.observe(contactCanvas); this.resize();
@@ -214,7 +216,7 @@ export class Field3D {
   private setLine(line: T.Line, points: T.Vector3[]) { line.geometry.dispose(); line.geometry = new THREE.BufferGeometry().setFromPoints(points); line.computeLineDistances(); }
   render(t: Trial | null, aim: Point | null, curve: number, lift: number, phase: ShotPhase = 'preparing', animationTime = 0) {
     if (!t) { this.renderer.render(this.scene, this.camera); return; }
-    this.zoneOffset = fieldZone(t.kind, t.layout);
+    this.zoneOffset = fieldZone(t.kind, t.layout,t.context);
     if (this.previewStart === null) this.previewStart = animationTime;
     this.resize();
     const contactVisible = !!this.contactCanvas.getClientRects().length;
@@ -244,8 +246,23 @@ export class Field3D {
     this.camera.updateMatrixWorld();
     this.crowds.forEach((crowd, i) => { crowd.position.y = t.outcome === 'goal' && this.appearance.crowd?.homeIsPlayer ? Math.abs(Math.sin(animationTime * 9 + i)) * .16 : 0; });
     if (t.kind === 'technique') {
-      this.actor(count++, t.player, '#d9fa6b'); this.ball.position.copy(this.vector(t.ball)); this.ball.position.y = BALL_RADIUS + Math.abs(Math.sin(t.time * 10)) * Math.min(.045, Math.hypot(t.velocity.x, t.velocity.y) / 5000); this.ball.rotation.x = t.travel / 12; this.ball.rotation.z = -t.travel / 24;
-      t.gates.forEach((p, i) => { let gate = this.gates[i]; if (!gate) { gate = new THREE.Mesh(new THREE.TorusGeometry(.65, .06, 8, 24), this.material('#d7fa76')); gate.rotation.x = -Math.PI / 2; this.scene.add(gate); this.gates[i] = gate; } gate.visible = i >= t.gate; gate.position.copy(this.vector(p)); gate.position.y = .05; gate.scale.setScalar(i === t.gate ? 1.2 : .8); gate.material = this.material(i === t.gate ? '#7cf5db' : '#718768'); });
+      this.actor(count++, t.player, '#d9fa6b'); this.ball.position.copy(this.vector(t.ball)); this.ball.position.y = BALL_RADIUS + Math.abs(Math.sin(t.time * 10)) * Math.min(.045, Math.hypot(t.velocity.x, t.velocity.y) / 5000); this.ball.rotation.x = t.ballTravel / 12; this.ball.rotation.z = -t.ballTravel / 24;this.trail.visible=false;
+      t.gates.forEach((p,i)=>{
+        let gate=this.gates[i];if(!gate){
+          gate=new THREE.Group();
+          for(const x of [-.92,.92]){const pole=new THREE.Mesh(new THREE.CylinderGeometry(.045,.07,.7,8),this.material('#f7eee0'));pole.position.set(x,.35,0);gate.add(pole);}
+          const stripe=new THREE.Mesh(new THREE.BoxGeometry(1.8,.018,.12),this.material('#7cf5db'));stripe.position.y=.025;gate.add(stripe);
+          const arrow=new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-.3,.03,.35),new THREE.Vector3(0,.03,0),new THREE.Vector3(.3,.03,.35)]),new THREE.LineBasicMaterial({color:'#7cf5db'}));gate.add(arrow);
+          const label=document.createElement('canvas');label.width=label.height=64;const c=label.getContext('2d')!;c.fillStyle='#123c38';c.fillRect(0,0,64,64);c.font='bold 44px sans-serif';c.textAlign='center';c.fillStyle='#e6fff4';c.fillText(String(i+1),32,48);const texture=new THREE.CanvasTexture(label);texture.colorSpace=THREE.SRGBColorSpace;this.textures.push(texture);
+          const number=new THREE.Sprite(new THREE.SpriteMaterial({map:texture}));number.position.set(1.15,.85,0);number.scale.set(.42,.42,1);gate.add(number);
+          this.scene.add(gate);this.gates[i]=gate;
+        }
+        gate.visible=i>=t.gate;gate.position.copy(this.vector(p));gate.position.y=0;
+        gate.children[0]!.visible=gate.children[1]!.visible=gate.children[4]!.visible=t.context!=='match';
+        (gate.children[2] as T.Mesh).material=this.material(i===t.gate?'#7cf5db':'#718768');gate.children[3]!.visible=i===t.gate;
+      });
+      if(t.context==='match'){t.defenders.forEach(p=>this.actor(count++,p,'#dd5860'));t.mates.forEach(p=>this.actor(count++,p,'#65beed'));}
+
       t.cones.forEach((p, i) => this.obstacle(i, p));
     } else if (t.kind === 'speed') {
       this.actor(count++, focus, '#d9fa6b'); this.ball.visible = false;
@@ -269,6 +286,8 @@ export class Field3D {
 
     if (t.kind === 'technique') this.ball.visible = true;
     else if (phase === 'aiming' && ['shoot', 'freekick', 'pass', 'vision'].includes(t.kind)) this.ball.visible = false;
+    this.dribbleGuide.visible=t.kind==='technique'&&!t.resolved&&!!t.gates[t.gate];
+    if(this.dribbleGuide.visible){const from=this.vector(t.player),to=this.vector(t.gates[t.gate]!);from.y=to.y=.035;this.setLine(this.dribbleGuide,[from,to]);}
     this.aimLine.visible = !!aim && !t.shot && !['speed', 'technique'].includes(t.kind);
     if (aim && this.aimLine.visible) { this.setLine(this.aimLine, this.path(t, aim, curve, lift));  }
     this.actors.forEach((actor, index) => {
@@ -290,7 +309,7 @@ export class Field3D {
       const kickTime = t.shot && (index === 0 || keeper) && !t.resolved ? t.shot.elapsed : null;
       const cameraYaw = Math.atan2(this.camera.position.x - actor.position.x, this.camera.position.z - actor.position.z);
       let direction = spriteFacing(yaw, cameraYaw);
-      let frame = spriteFrame(animationTime, moving, kickTime, keeper);
+      let frame = spriteFrame(index===0&&t.kind==='technique'?t.travel/180:animationTime,moving,kickTime,keeper);
       if (index === 0 && t.outcome === 'goal') { actor.userData.goalStart ??= animationTime; if (animationTime - actor.userData.goalStart < 3) frame = playerAnimationFrame('celebrate', animationTime - actor.userData.goalStart); }
       else delete actor.userData.goalStart;
       if (index === refereeIndex && ['goal', 'offside'].includes(t.referee.signal)) { actor.userData.signalStart ??= animationTime; frame = playerAnimationFrame(t.referee.signal === 'goal' ? 'goal-check' : 'offside', animationTime - actor.userData.signalStart); } else delete actor.userData.signalStart;

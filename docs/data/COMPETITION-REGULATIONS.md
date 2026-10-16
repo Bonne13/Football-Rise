@@ -35,7 +35,7 @@ Copas nacionais só são criadas quando existe nome de referência catalogado. N
 
 Nos grupos com arredondamento para cima, o benefício do meio ponto é removido no desempate em pontos. Critérios disciplinares, reaplicações específicas de confronto direto e sorteios oficiais ainda não são completos; a interface mantém essa indicação.
 
-O controlador cria o terceiro jogo de uma série MLS **somente** se os dois primeiros terminarem 1–1 em vitórias. Cada partida empatada da série é decidida por pênaltis, sem somar gols entre jogos. Quartas/semifinais mexicanas empatadas no agregado classificam o melhor da fase regular e não aceitam pênaltis; a final empatada exige desempate. Prorrogação continua fora do motor.
+O controlador cria o terceiro jogo de uma série MLS **somente** se os dois primeiros terminarem 1–1 em vitórias. Cada partida empatada da série é decidida por pênaltis, sem somar gols entre jogos. Quartas/semifinais mexicanas empatadas no agregado classificam o melhor da fase regular e não aceitam pênaltis; a final empatada exige desempate. Nas versões novas, finais mexicanas e argentinas, fases finais da MLS e decisões continentais compatíveis possuem prorrogação. Play-in/séries MLS, mata-matas argentinos antes da final e final colombiana usam pênaltis diretos.
 
 ### Dados locais e reprodução
 
@@ -43,13 +43,13 @@ O controlador cria o terceiro jogo de uma série MLS **somente** se os dois prim
 
 O importador verifica as conferências/zonas e os números de jogos cruzados por clube. Para o segundo torneio argentino/colombiano, os mandos da referência são invertidos; isso não é anunciado como cópia do calendário oficial do Clausura/Finalización. México usa sorteio circular da fase regular. Calendários são posicionados dentro do ano de carreira julho–junho; datas reais não foram importadas.
 
-Pacotes completos fictícios recebem zonas/conferências e confrontos procedurais, com aviso. Se faltar a quantidade necessária de clubes em um dos seis formatos, a edição fica indisponível em vez de simular uma fase de tamanho incorreto. Acesso/descenso, tabela anual para vagas externas, repescagens europeias e decisões de vagas dependentes de outras copas ainda não são executados. As temporadas históricas acima **não confirmam as regras de 2026/27**.
+Pacotes completos fictícios recebem zonas/conferências e confrontos procedurais, com aviso. Se faltar a quantidade necessária de clubes em um dos seis formatos, a edição fica indisponível em vez de simular uma fase de tamanho incorreto. Tabela anual para vagas externas, repescagens europeias e decisões de vagas dependentes de outras copas ainda não são executadas. Acesso/descenso está implementado apenas nos caminhos documentados abaixo. As temporadas históricas acima **não confirmam as regras de 2026/27**.
 
 ## Persistência e arquitetura
 
-O ID opcional `Tournament.regulationId` seleciona uma definição imutável (`rules-v1:*`, `rules-v2:*` ou `continental-v1:*`). Saves v3/world v1 anteriores, sem esse campo, continuam aceitos e preservam seu calendário e comportamento compacto. Não há migração que reescreva resultados. IDs desconhecidos ou incompatíveis com a competição são recusados. Mudanças futuras de regras exigem novos IDs. Os dois torneios semestrais têm IDs de competição e premiações próprios (`league:*` e `league-clausura:*`), evitando sobrescrever um campeão pelo outro.
+O ID opcional `Tournament.regulationId` seleciona uma definição imutável (`rules-v1:*`, `rules-v2:*`, `rules-v3:*`, `continental-v1:*`, `continental-v2:*` e `promotion-v1:*`). Saves v3/world v1 anteriores, sem esse campo, continuam aceitos e preservam seu calendário e comportamento compacto. Não há migração que reescreva resultados. IDs desconhecidos ou incompatíveis com a competição são recusados. Mudanças futuras de regras exigem novos IDs. Os dois torneios semestrais têm IDs de competição e premiações próprios (`league:*` e `league-clausura:*`), evitando sobrescrever um campeão pelo outro.
 
-Ida/volta compartilha competição, fase, rodada e adversários, com mandos invertidos; a decisão usa soma dos placares. O primeiro jogo pode terminar empatado sem pênaltis. No segundo, pênaltis só são válidos com empate no agregado, inclusive quando o placar daquele jogo não é um empate. Prorrogação não é simulada nesta versão.
+Ida/volta compartilha competição, fase, rodada e adversários, com mandos invertidos; a decisão usa soma dos placares. O primeiro jogo pode terminar empatado sem pênaltis. No segundo, pênaltis só são válidos com empate no agregado, inclusive quando o placar daquele jogo não é um empate. Prorrogação é simulada nas novas versões de regulamento, com 30 minutos adicionais e placar extra persistido. Versões anteriores mantêm o desempate original. O protagonista não recebe automaticamente 30 minutos ou estatísticas extras por oportunidades que não jogou.
 
 Domínio calcula classificação, calendário, grupos e vencedores; dados descrevem referências; UI apenas apresenta; persistência valida os estados.
 
@@ -60,3 +60,17 @@ Domínio calcula classificação, calendário, grupos e vencedores; dados descre
 `npm run test:special-leagues` verifica conferências, wild cards, série, play-in, grupos e campeões no navegador; inclui persistência de um mundo completo de aproximadamente 11 MB e layout móvel.
 
 Publicação do jogo continua condicionada à aprovação visual já solicitada pelo usuário. A galeria de imagens pode ser atualizada separadamente.
+
+
+## Acesso/descenso e prorrogação — revisão seguinte
+
+`season-movement.ts` calcula os movimentos sem editar os snapshots históricos. As listas de participantes das ligas no save definem a divisão vigente; assim, um clube promovido não retorna à divisão original do arquivo importado no ano seguinte.
+
+- Inglaterra: Premier League/Championship (20/24); Championship/League One (24/24); League One/League Two (24/24). Sobem dois automaticamente nos dois primeiros caminhos e três no último; quatro classificados disputam duas semifinais em ida/volta e uma final única pela vaga restante. O melhor classificado decide a semifinal em casa. Descensos de três, três e quatro, respectivamente.
+- Brasil: Série A/Série B completas (20/20) trocam quatro clubes. A Série B disponível no pacote atual contém apenas 18 participantes, portanto esse caminho fica suspenso nesse pacote. Não se inventam dois participantes nem se executa promoção com tabela parcial. Teste com cadastro completo adicional valida a regra.
+- Só edições novas `rules-v3:*`, ligas completas e encerradas e playoff encerrado podem gerar trocas. Os participantes e calendários dos saves v1/v2 anteriores são preservados. Rodadas das divisões inglesas inferiores usam intervalo adaptado de seis dias para encerrar o playoff dentro do ano de carreira julho–junho.
+- Clubes continuam únicos e os tamanhos das duas divisões são mantidos. O principal do clube do protagonista gera aviso na história da carreira se subir ou cair.
+
+`extra-time.ts` define fases compatíveis; o ID novo é `continental-v2:*`, `promotion-v1:*` ou o sufixo imutável `:extra-time-v1` nos seis formatos especiais. UEFA, Copa do Mundo e playoffs ingleses admitem prorrogação nas decisões. Libertadores, Sudamericana e Champions Cup usam prorrogação apenas na final única. Argentina e México apenas na final; MLS nas decisões posteriores à série. Colômbia, Central American Cup, Caribbean Cup e séries/wild cards MLS mantêm decisão direta por pênaltis. Critérios de gol fora das competições CONCACAF ainda não estão integralmente reproduzidos.
+
+`Fixture.extraTime` é opcional e contém os gols adicionais; os gols totais já incluem esses valores. Só pode existir após empate decisivo no agregado, na fase compatível e após todos os jogos do confronto. A persistência rejeita prorrogação em liga, jogo de ida ou fase sem essa regra. Os NPCs podem registrar 120 minutos; o protagonista registra apenas os minutos efetivamente atribuídos à sua atuação. A partida jogável ainda é uma sequência de oportunidades, não uma simulação integral de 120 minutos controlados.

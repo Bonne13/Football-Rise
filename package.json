@@ -15,7 +15,9 @@
     "test:stadiums": "npm run build:web && node scripts/test-stadiums.cjs",
     "test:crowd": "npm run build:web && node scripts/test-crowd.cjs",
     "test:leagues": "npm run build:web && node scripts/test-leagues.cjs",
-    "test:special-leagues": "npm run build:web && node scripts/test-special-leagues.cjs"
+    "test:special-leagues": "npm run build:web && node scripts/test-special-leagues.cjs",
+    "test:dribble": "npm run build:web && node scripts/test-dribble.cjs",
+    "test:season-rollover": "npm run build:web && node scripts/test-season-rollover.cjs"
   },
   "devDependencies": {
     "@types/node": "24.19.2",
