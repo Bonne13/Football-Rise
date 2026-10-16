@@ -14,6 +14,7 @@ function consolidateBoxes(parent: T.Object3D) {
 }
 /** Procedural four-sided stadium and scenery; independent of the football rules. */
 export function buildStadium(scene: T.Scene, profile: StadiumProfile, colors: { primary: string; secondary: string }) {
+  const seatColors = profile.seatColors ?? [colors.primary, colors.secondary];
   let seed = profile.seed;
   const random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
   const material = (color: string) => new THREE.MeshStandardMaterial({ color, roughness: .88 });
@@ -23,10 +24,19 @@ export function buildStadium(scene: T.Scene, profile: StadiumProfile, colors: { 
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), mat); mesh.position.set(...position); parent.add(mesh); return mesh;
   };
   const grass = new THREE.Mesh(new THREE.PlaneGeometry(2500, 2500), material(profile.country === 'Brasil' ? '#4f744a' : '#637b52')); grass.rotation.x = -Math.PI / 2; grass.position.set(0, -.08, 52.5); grass.receiveShadow = true; scene.add(grass);
-  const rows = profile.size === 'local' ? 3 : profile.size === 'regional' ? 7 : 14;
-  const sides = [{ x: 0, z: -8, rotation: 0, length: 70 }, { x: 0, z: 113, rotation: Math.PI, length: 70 }, { x: -42, z: 52.5, rotation: Math.PI / 2, length: 110 }, { x: 42, z: 52.5, rotation: -Math.PI / 2, length: 110 }];
+  const rows = Math.max(3, Math.min(19, Math.round(Math.sqrt(profile.capacity / 250))));
+  const oval = profile.shape === 'oval';
+  const sideX = oval ? (profile.track ? 57 : 49) : 42, endZ = oval ? (profile.track ? 37.5 : 23.5) : 8;
+  if (profile.track) {
+    const trackMaterial = material('#a65846');
+    const track = new THREE.Mesh(new THREE.RingGeometry(48, 55, 96), trackMaterial); track.rotation.x = -Math.PI / 2; track.scale.y = 76 / 48; track.position.set(0, -.015, 52.5); scene.add(track);
+    for (let lane = 1; lane < 8; lane++) {
+      const ring = new THREE.Mesh(new THREE.RingGeometry(48 + lane * .85, 48.04 + lane * .85, 96), pale); ring.rotation.x = -Math.PI / 2; ring.scale.y = 76 / 48; ring.position.set(0, -.01, 52.5); scene.add(ring);
+    }
+  }
+  const sides = [{ x: 0, z: -endZ, rotation: 0, length: oval ? 94 : 70 }, { x: 0, z: 105 + endZ, rotation: Math.PI, length: oval ? 94 : 70 }, { x: -sideX, z: 52.5, rotation: Math.PI / 2, length: 110 }, { x: sideX, z: 52.5, rotation: -Math.PI / 2, length: 110 }];
   const seatGeo = new THREE.BoxGeometry(.5, .36, .5), seatMat = material('#ffffff');
-  for (const [sideIndex, side] of sides.entries()) {
+  for (const [sideIndex, side] of (oval ? [] : sides).entries()) {
     const stand = new THREE.Group(); stand.name = `stand-${sideIndex}`; stand.position.set(side.x, 0, side.z); stand.rotation.y = side.rotation;
     const seatsPerRow = Math.floor(side.length / .72), chairs = new THREE.InstancedMesh(seatGeo, seatMat, rows * seatsPerRow);
     for (let row = 0; row < rows; row++) {
@@ -35,7 +45,7 @@ export function buildStadium(scene: T.Scene, profile: StadiumProfile, colors: { 
       for (let seat = 0; seat < seatsPerRow; seat++) {
         const i = row * seatsPerRow + seat;
         chairs.setMatrixAt(i, new THREE.Matrix4().makeTranslation(-side.length / 2 + .5 + seat * .72, height + .2, depth));
-        chairs.setColorAt(i, new THREE.Color((seat + row * 2) % 11 < 3 ? colors.secondary : colors.primary));
+        chairs.setColorAt(i, new THREE.Color((seat + row * 2) % 11 < 3 ? seatColors[1] : seatColors[0]));
       }
     }
     chairs.instanceMatrix.needsUpdate = true; stand.add(chairs);
@@ -53,7 +63,8 @@ export function buildStadium(scene: T.Scene, profile: StadiumProfile, colors: { 
         box(stand, [3.4, .12, 1.4], [x, 2.3, -rows * 1.05 - 1.1], pale);
       }
     }
-    if (profile.size !== 'local' || sideIndex === 2) {
+    // Continuous arenas, partial traditional roofs and uncovered terraces differ visibly.
+    if (profile.roof === 'full' || profile.roof === 'partial' && sideIndex === 2) {
       const roof = new THREE.Mesh(new THREE.BoxGeometry(side.length + 2, .22, rows * .8 + 3), pale); roof.position.set(0, top + 2.5, -rows * .55); roof.rotation.x = -.035; roof.castShadow = true; stand.add(roof);
       const roofDepth = rows * .8 + 3;
       box(stand, [side.length + 2, .5, .22], [0, top + 2.4, -rows * .55 + roofDepth / 2], clubTrim);
@@ -61,6 +72,21 @@ export function buildStadium(scene: T.Scene, profile: StadiumProfile, colors: { 
         const rib = box(stand, [.09, .12, roofDepth], [x, top + 2.65, -rows * .55], dark); rib.rotation.x = -.035;
       }
       for (let x = -side.length / 2; x <= side.length / 2; x += side.length / 5) { const post = new THREE.Mesh(new THREE.CylinderGeometry(.09, .13, top + 3, 6), dark); post.position.set(x, (top + 3) / 2, -rows * 1.05); stand.add(post); }
+    }
+    // Tier fascias and vomitories break up the terraces; unique venue seed controls accents.
+    for (let tier = 1; tier < profile.tiers; tier++) {
+      const row = Math.floor(rows * tier / profile.tiers);
+      box(stand, [side.length, .38, .3], [0, .8 + row * .56, -row * 1.05 + .5], clubTrim);
+      for (const x of [-side.length / 4, side.length / 4]) box(stand, [2.4, 1.5, .7], [x, .55 + row * .56, -row * 1.05], dark);
+    }
+    if (profile.facade !== 'concrete') {
+      const skin = profile.facade === 'glass' ? material('#73979e') : pale;
+      const outside = -rows * 1.05 - 1.2;
+      for (let x = -side.length / 2; x < side.length / 2; x += 3) {
+        box(stand, [2.75, top + 2, .2], [x + 1.4, (top + 2) / 2, outside], skin);
+        box(stand, [.12, top + 2.2, .38], [x, (top + 2.2) / 2, outside - .15], dark);
+      }
+      if (profile.facade === 'ribs') for (let y = 1; y < top + 2.5; y += .65) box(stand, [side.length, .16, .55], [0, y, outside - .4], pale);
     }
     const fence = new THREE.Mesh(new THREE.BoxGeometry(side.length, profile.size === 'local' ? 1.15 : 1.8, .15), dark); fence.position.set(0, profile.size === 'local' ? .6 : .9, 2); stand.add(fence);
     // Lightweight instanced spectators in the match arenas, leaving clear access aisles.
@@ -78,7 +104,7 @@ export function buildStadium(scene: T.Scene, profile: StadiumProfile, colors: { 
     }
     consolidateBoxes(stand); scene.add(stand);
   }
-  if (profile.size === 'arena') {
+  if (profile.size === 'arena' && profile.shape === 'bowl') {
     const top = .55 + rows * .56;
     const corners = [{ x: 34, z: 0, angle: 0 }, { x: -34, z: 0, angle: Math.PI / 2 }, { x: -34, z: 105, angle: Math.PI }, { x: 34, z: 105, angle: Math.PI * 1.5 }];
     for (const corner of corners) {
@@ -86,12 +112,51 @@ export function buildStadium(scene: T.Scene, profile: StadiumProfile, colors: { 
       for (let row = 0; row < rows; row++) {
         const radius = 8 + row * 1.05, height = .55 + row * .56;
         const step = new THREE.Mesh(new THREE.RingGeometry(radius, radius + 1.05, 20, 1, corner.angle, Math.PI / 2), concrete); step.rotation.x = -Math.PI / 2; step.position.set(corner.x, height, corner.z); scene.add(step);
-        for (let seat = 0; seat < 14; seat++) { const angle = corner.angle + (seat + .5) / 14 * Math.PI / 2; seats.setMatrixAt(index, new THREE.Matrix4().makeTranslation(corner.x + Math.cos(angle) * radius, height + .2, corner.z - Math.sin(angle) * radius)); seats.setColorAt(index, new THREE.Color(seat % 5 ? colors.primary : colors.secondary)); index++; }
+        for (let seat = 0; seat < 14; seat++) { const angle = corner.angle + (seat + .5) / 14 * Math.PI / 2; seats.setMatrixAt(index, new THREE.Matrix4().makeTranslation(corner.x + Math.cos(angle) * radius, height + .2, corner.z - Math.sin(angle) * radius)); seats.setColorAt(index, new THREE.Color(seat % 5 ? seatColors[0] : seatColors[1])); index++; }
       }
       const roof = new THREE.Mesh(new THREE.RingGeometry(7.8, 23, 28, 1, corner.angle, Math.PI / 2), pale); roof.rotation.x = -Math.PI / 2; roof.position.set(corner.x, top + 2.5, corner.z); roof.material.side = THREE.DoubleSide; roof.castShadow = true; scene.add(roof);
       seats.instanceMatrix.needsUpdate = true; scene.add(seats);
       for (let i = 0; i < 3; i++) { const angle = corner.angle + i / 2 * Math.PI / 2; box(scene, [.15, top + 2.5, .15], [corner.x + Math.cos(angle) * 22, (top + 2.5) / 2, corner.z - Math.sin(angle) * 22], dark); }
     }
+  }
+  if (oval) {
+    const innerX = sideX, innerZ = 52.5 + endZ;
+    const ellipse = (rx: number, rz: number, ix: number, iz: number, mat: T.Material, height: number) => {
+      const shape = new THREE.Shape(); shape.absellipse(0, 0, rx, rz, 0, Math.PI * 2, false, 0);
+      const hole = new THREE.Path(); hole.absellipse(0, 0, ix, iz, 0, Math.PI * 2, true, 0); shape.holes.push(hole);
+      const mesh = new THREE.Mesh(new THREE.ShapeGeometry(shape, 80), mat); mesh.rotation.x = -Math.PI / 2; mesh.position.set(0, height, 52.5); mesh.receiveShadow = true; scene.add(mesh); return mesh;
+    };
+    const seatsPerRow = 340, chairs = new THREE.InstancedMesh(seatGeo, seatMat, rows * seatsPerRow);
+    const crowd = new THREE.InstancedMesh(new THREE.CapsuleGeometry(.15, .24, 2, 5), material('#ffffff'), rows * seatsPerRow); let people = 0;
+    for (let row = 0; row < rows; row++) {
+      const rx = innerX + row * 1.05, rz = innerZ + row * 1.05, height = .55 + row * .56;
+      ellipse(rx + 1.05, rz + 1.05, rx, rz, concrete, height);
+      const riser = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, .56, 96, 1, true), concrete); riser.scale.set(rx, 1, rz); riser.position.set(0, height - .28, 52.5); scene.add(riser);
+      for (let seat = 0; seat < seatsPerRow; seat++) {
+        const angle = seat / seatsPerRow * Math.PI * 2, x = Math.cos(angle) * (rx + .5), z = 52.5 + Math.sin(angle) * (rz + .5);
+        const transform = new THREE.Object3D(); transform.position.set(x, height + .2, z); transform.rotation.y = -angle; transform.updateMatrix();
+        const index = row * seatsPerRow + seat; chairs.setMatrixAt(index, transform.matrix); chairs.setColorAt(index, new THREE.Color(seat % 32 < 8 ? seatColors[1] : seatColors[0]));
+        if (seat % 28 < 2) continue;
+        if (profile.size === 'arena' && random() < .55) { crowd.setMatrixAt(people, new THREE.Matrix4().makeTranslation(x, height + .55, z)); crowd.setColorAt(people, new THREE.Color([colors.primary, colors.secondary, '#bd967b', '#253747'][people % 4])); people++; }
+      }
+      if (row > 0 && row % Math.max(1, Math.floor(rows / profile.tiers)) === 0) ellipse(rx + 1, rz + 1, rx + .65, rz + .65, clubTrim, height + .4);
+    }
+    chairs.instanceMatrix.needsUpdate = true; scene.add(chairs); crowd.count = people; crowd.instanceMatrix.needsUpdate = true; scene.add(crowd);
+    const outerX = innerX + rows * 1.05, outerZ = innerZ + rows * 1.05;
+    const facade = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, rows * .56 + 1, 96, 1, true), new THREE.MeshStandardMaterial({ color: '#a1aba8', roughness: .8, side: THREE.DoubleSide }));
+    facade.scale.set(outerX + 2, 1, outerZ + 2); facade.position.set(0, rows * .28, 52.5); scene.add(facade);
+    if (profile.roof === 'full') {
+      const canopy = ellipse(outerX + 3, outerZ + 3, innerX - 1.5, innerZ - 1.5, new THREE.MeshStandardMaterial({ color: '#d8dedb', side: THREE.DoubleSide, roughness: .7 }), rows * .56 + 3.1); canopy.castShadow = true;
+      for (let i = 0; i < 48; i++) { const angle = i / 48 * Math.PI * 2; const beam = box(scene, [.1, .15, rows * 1.05 + 3], [Math.cos(angle) * (outerX + innerX) / 2, rows * .56 + 3.25, 52.5 + Math.sin(angle) * (outerZ + innerZ) / 2], dark); beam.rotation.y = Math.atan2(Math.cos(angle), Math.sin(angle)); }
+    }
+  }
+  if (profile.name === 'San Siro') {
+    const towerMaterial = material('#9a9b95'), red = material('#a43330');
+    for (const x of [-42, 42]) for (const z of [-9, 114]) {
+      const tower = new THREE.Mesh(new THREE.CylinderGeometry(3, 3.5, 16, 16), towerMaterial); tower.position.set(x, 8, z); scene.add(tower);
+      for (let level = 0; level < 8; level++) { const ramp = new THREE.Mesh(new THREE.TorusGeometry(3.4, .17, 4, 24), pale); ramp.rotation.x = Math.PI / 2; ramp.position.set(x, 1 + level * 2, z); scene.add(ramp); }
+    }
+    for (const z of [-10, 115]) box(scene, [92, .7, 1.1], [0, 16.5, z], red);
   }
   for (const x of [-37, 37]) for (const z of [-3, 108]) {
     const height = profile.size === 'arena' ? 24 : 14;
@@ -108,13 +173,13 @@ export function buildStadium(scene: T.Scene, profile: StadiumProfile, colors: { 
   const screenContext = screenCanvas.getContext('2d')!;
   screenContext.fillStyle = '#091722'; screenContext.fillRect(0, 0, 512, 192);
   screenContext.fillStyle = '#bce9cf'; screenContext.font = 'bold 32px sans-serif'; screenContext.textAlign = 'center'; screenContext.fillText('FOOTBALL RISE', 256, 51);
-  screenContext.fillStyle = '#f5faf9'; screenContext.font = 'bold 45px sans-serif'; screenContext.fillText(profile.size === 'arena' ? 'MATCH DAY' : 'RISE ACADEMY', 256, 134);
+  screenContext.fillStyle = '#f5faf9'; screenContext.font = 'bold 45px sans-serif'; screenContext.font = 'bold 27px sans-serif'; screenContext.fillText(profile.name, 256, 130, 480);
   const screenTexture = new THREE.CanvasTexture(screenCanvas); screenTexture.colorSpace = THREE.SRGBColorSpace;
   const screenMaterial = new THREE.MeshBasicMaterial({ map: screenTexture });
   const scoreboard = new THREE.Mesh(new THREE.PlaneGeometry(9, 3.4), screenMaterial); scoreboard.position.set(0, rows * .56 + 5.1, -rows * 1.05 - 10); scene.add(scoreboard);
   for (const x of [-3.8, 3.8]) box(scene, [.18, 5, .2], [x, rows * .56 + 2.6, -rows * 1.05 - 10.1], dark);
   // Curving access path outside the bowl, visible at the corners and through low stands.
-  const path = new THREE.Mesh(new THREE.RingGeometry(76, 81, 80), material('#7b817b')); path.rotation.x = -Math.PI / 2; path.scale.y = 1.2; path.position.set(0, -.045, 52.5); scene.add(path);
+  const path = new THREE.Mesh(new THREE.RingGeometry(Math.max(76, sideX + rows * 1.05 + 12), Math.max(81, sideX + rows * 1.05 + 17), 80), material('#7b817b')); path.rotation.x = -Math.PI / 2; path.scale.y = 1.2; path.position.set(0, -.045, 52.5); scene.add(path);
   if (profile.landscape === 'urban') {
     const count = profile.size === 'arena' ? 80 : 40;
     const buildings = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), material('#a1aeb0'), count);
@@ -151,14 +216,14 @@ export function buildStadium(scene: T.Scene, profile: StadiumProfile, colors: { 
       const color = new THREE.Color(h > 65 ? '#818d83' : h > 30 ? '#536e54' : '#668455'); vertexColors.push(color.r, color.g, color.b);
     }
     terrain.setAttribute('color', new THREE.Float32BufferAttribute(vertexColors, 3)); terrain.computeVertexNormals();
-    const hills = new THREE.Mesh(terrain, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 })); hills.rotation.x = -Math.PI / 2; hills.position.set(0, -.065, 52.5); scene.add(hills);
+    const hills = new THREE.Mesh(terrain, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 })); hills.rotation.x = -Math.PI / 2; hills.position.set(0, -.6, 52.5); scene.add(hills);
   }
   const treeCount = profile.landscape === 'urban' ? 30 : 90;
   const trees = new THREE.InstancedMesh(new THREE.SphereGeometry(2.3, 8, 6), material(profile.country === 'Brasil' ? '#285a3b' : '#375a40'), treeCount);
   const trunks = new THREE.InstancedMesh(new THREE.CylinderGeometry(.22, .4, 3, 5), material('#705b42'), treeCount);
   let planted = 0;
   for (let i = 0; i < treeCount; i++) {
-    const angle = random() * Math.PI * 2, radius = 83 + random() * 20, x = Math.cos(angle) * radius, z = 52.5 + Math.sin(angle) * radius * 1.2;
+    const angle = random() * Math.PI * 2, radius = Math.max(83, sideX + rows * 1.05 + 20) + random() * 20, x = Math.cos(angle) * radius, z = 52.5 + Math.sin(angle) * radius * 1.2;
     if (profile.landscape === 'coastal' && z < -50) continue;
     const treeScale = .75 + random() * .65; const treeTransform = new THREE.Object3D(); treeTransform.position.set(x, 4.7 * treeScale, z); treeTransform.scale.set(treeScale, (profile.country === 'Brasil' ? 1.2 : 1.65) * treeScale, treeScale); treeTransform.updateMatrix(); trees.setMatrixAt(planted, treeTransform.matrix); trunks.setMatrixAt(planted, new THREE.Matrix4().makeTranslation(x, 1.5, z)); planted++;
   }

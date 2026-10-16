@@ -11,7 +11,8 @@
     "test:browser": "npm run build:web && node scripts/test-browser.cjs",
     "test:desktop": "npm run build:web && node scripts/test-desktop.cjs",
     "test:controls": "npm run build:web && node scripts/test-controls.cjs",
-    "test:var": "npm run build:web && node scripts/test-var.cjs"
+    "test:var": "npm run build:web && node scripts/test-var.cjs",
+    "test:stadiums": "npm run build:web && node scripts/test-stadiums.cjs"
   },
   "devDependencies": {
     "@types/node": "24.19.2",
