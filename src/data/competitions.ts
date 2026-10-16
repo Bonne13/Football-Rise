@@ -1,11 +1,11 @@
 import { countriesIn } from './associations.js';
 export interface CompetitionSpec { key: string; name: string; scope: 'national' | 'continental' | 'international' | 'state' | 'youth'; format: 'league' | 'cup' | 'league-knockout' | 'groups'; rounds: number; startMonth: number; startDay: number }
 export const CUP_SPECS: CompetitionSpec[] = [
-  { key: 'champions', name: 'Champions League', scope: 'continental', format: 'league-knockout', rounds: 8, startMonth: 9, startDay: 16 },
-  { key: 'europa', name: 'Europa League', scope: 'continental', format: 'league-knockout', rounds: 8, startMonth: 9, startDay: 17 },
-  { key: 'conference', name: 'Conference League', scope: 'continental', format: 'league-knockout', rounds: 6, startMonth: 10, startDay: 1 },
-  { key: 'libertadores', name: 'Copa Libertadores', scope: 'continental', format: 'groups', rounds: 6, startMonth: 3, startDay: 3 },
-  { key: 'sudamericana', name: 'Copa Sudamericana', scope: 'continental', format: 'groups', rounds: 6, startMonth: 3, startDay: 5 },
+  { key: 'champions', name: 'UEFA Champions League', scope: 'continental', format: 'league-knockout', rounds: 8, startMonth: 9, startDay: 16 },
+  { key: 'europa', name: 'UEFA Europa League', scope: 'continental', format: 'league-knockout', rounds: 8, startMonth: 9, startDay: 17 },
+  { key: 'conference', name: 'UEFA Conference League', scope: 'continental', format: 'league-knockout', rounds: 6, startMonth: 10, startDay: 1 },
+  { key: 'libertadores', name: 'CONMEBOL Libertadores', scope: 'continental', format: 'groups', rounds: 6, startMonth: 3, startDay: 3 },
+  { key: 'sudamericana', name: 'CONMEBOL Sudamericana', scope: 'continental', format: 'groups', rounds: 6, startMonth: 3, startDay: 5 },
   { key: 'concacaf-champions', name: 'CONCACAF Champions Cup', scope: 'continental', format: 'cup', rounds: 5, startMonth: 2, startDay: 3 },
   { key: 'central-american', name: 'CONCACAF Central American Cup', scope: 'continental', format: 'groups', rounds: 4, startMonth: 8, startDay: 4 },
   { key: 'caribbean', name: 'CONCACAF Caribbean Cup', scope: 'continental', format: 'groups', rounds: 4, startMonth: 8, startDay: 6 },

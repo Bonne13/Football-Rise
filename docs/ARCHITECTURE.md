@@ -269,3 +269,7 @@ A apresentação recebe o perfil e as cores do mandante, inclusive quando o prot
 ## Ligas por confederação e divisões
 
 `data/associations.ts` cataloga UEFA/CONMEBOL/CONCACAF; `data/league-snapshots.ts` associa identidades de clubes a divisões e fontes históricas. O mundo cria ligas indisponíveis quando faltam participantes, separa níveis e grupos não confirmados, conserva clubes transfronteiriços em seu sistema e restringe classificação continental à primeira divisão apropriada. Novas copas continentais usam os formatos compactos existentes. A UI filtra por confederação, apresenta cobertura e oferece o pacote ampliado opcional. Calendários salvos não são substituídos na carga. Fontes, lacunas e validação: `docs/data/GLOBAL-LEAGUES.md`.
+
+### Regulamentos de competições
+
+As novas edições podem persistir `Tournament.regulationId`, um ID de regras imutáveis. O campo é opcional: saves anteriores sem ID preservam o comportamento compacto e seu calendário. O catálogo em `src/data/competition-regulations.ts` distingue formatos executados e referências ainda não implementadas; a interface apresenta essa cobertura. Ida/volta é identificada por competição, fase, rodada e adversários invertidos; o domínio decide pelo agregado e a persistência valida o desempate. Mudanças futuras de regras precisam de novos IDs, sem reinterpretar resultados salvos. Limites e fontes estão em `docs/data/COMPETITION-REGULATIONS.md`.

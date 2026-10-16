@@ -1,3 +1,4 @@
+import { regulationFor, regulationById, REAL_CUP_NAMES } from '../../data/competition-regulations.js';
 import { ASSOCIATIONS, associationFor } from '../../data/associations.js';
 import { LEAGUE_SNAPSHOTS, membershipFor } from '../../data/league-snapshots.js';
 import { addDays, ageOn, draw, requireRule } from '../../core/rules.js';
@@ -6,7 +7,7 @@ import type { CareerState, Club, Performance } from '../career/state.js';
 import { calculateOverall } from '../player/player.js';
 export interface Team { id: string; name: string; country: string; strength: number; national: boolean }
 export interface Fixture { id: string; competitionId: string; round: number; stage: string; group: number; date: string; home: string; away: string; homeGoals: number | null; awayGoals: number | null; penalties: [number, number] | null }
-export interface Tournament { id: string; key: string; name: string; season: number; level: 'youth' | 'senior' | 'national'; format: 'league' | 'cup' | 'league-knockout' | 'groups'; phase: 'league' | 'groups' | 'playoff' | 'knockout' | 'complete' | 'unavailable'; participants: string[]; groups: string[][]; waiting: string[]; champion: string | null; notice: string }
+export interface Tournament { id: string; key: string; name: string; season: number; level: 'youth' | 'senior' | 'national'; format: 'league' | 'cup' | 'league-knockout' | 'groups'; phase: 'league' | 'groups' | 'playoff' | 'knockout' | 'complete' | 'unavailable'; participants: string[]; groups: string[][]; waiting: string[]; champion: string | null; notice: string; regulationId?: string }
 export interface PlayerStats { playerId: string; name: string; teamId: string; competitionId: string; position: string; birthDate: string | null; appearances: number; minutes: number; goals: number; assists: number; ratingTotal: number; cleanSheets: number }
 export interface Award { id: string; season: number; competitionId: string; kind: 'champion' | 'top-scorer' | 'best-player' | 'young-player' | 'goalkeeper' | 'team-of-tournament' | 'season-player'; name: string; playerId: string | null; playerName: string; teamId: string; value: number }
 export interface SeasonSummary { season: number; champions: { competition: string; team: string }[] }
@@ -18,13 +19,35 @@ const seasonOn = (date: string) => Number(date.slice(0, 4)) - (date.slice(5, 7) 
 const sortedTeams = (clubs: readonly Club[]) => [...clubs].sort((a, b) => b.squadOverall - a.squadOverall || compare(a.id, b.id));
 export function standings(w: CompetitionWorld, t: Tournament, group?: number): Standing[] {
   const rows = new Map((group === undefined ? t.participants : t.groups[group] ?? []).map(teamId => [teamId, { teamId, played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, points: 0 }]));
+  const rule = regulationById(t.regulationId), split = rule && ['scottish-split','austrian-split'].includes(rule.engine);
+  let carried = false;
+  const halve = () => { if (!carried && rule?.engine === 'austrian-split' && t.groups.length) { for (const row of rows.values()) row.points = Math.floor(row.points / 2); carried = true; } };
   for (const f of w.fixtures) {
-    if (f.competitionId !== t.id || !['league', 'groups'].includes(f.stage) || f.homeGoals === null || f.awayGoals === null || (group !== undefined && f.group !== group)) continue;
-    const h = rows.get(f.home), a = rows.get(f.away); if (!h || !a) continue;
-    h.played++; a.played++; h.goalsFor += f.homeGoals; h.goalsAgainst += f.awayGoals; a.goalsFor += f.awayGoals; a.goalsAgainst += f.homeGoals;
-    if (f.homeGoals === f.awayGoals) { h.drawn++; a.drawn++; h.points++; a.points++; } else { const winner = f.homeGoals > f.awayGoals ? h : a, loser = winner === h ? a : h; winner.won++; loser.lost++; winner.points += 3; }
+    if (f.competitionId !== t.id || !['league', 'groups'].includes(f.stage) || f.homeGoals === null || f.awayGoals === null || (group !== undefined && f.group !== group && !(split && f.stage === 'league'))) continue;
+    if (f.stage === 'groups') halve();
+    const update=(row:Standing|undefined,scored:number,conceded:number)=>{if(!row)return;row.played++;row.goalsFor+=scored;row.goalsAgainst+=conceded;if(scored===conceded){row.drawn++;row.points++;}else if(scored>conceded){row.won++;row.points+=3;}else row.lost++;};
+    update(rows.get(f.home),f.homeGoals,f.awayGoals);update(rows.get(f.away),f.awayGoals,f.homeGoals);
   }
-  return [...rows.values()].sort((a, b) => b.points - a.points || (b.goalsFor - b.goalsAgainst) - (a.goalsFor - a.goalsAgainst) || b.goalsFor - a.goalsFor || compare(a.teamId, b.teamId));
+  halve();
+  const tied = new Map<number,string[]>();
+  for (const row of rows.values()) tied.set(row.points,[...(tied.get(row.points) ?? []),row.teamId]);
+  const mini = (ids:string[]) => {
+    const points = new Map(ids.map(id=>[id,0])), gd = new Map(points);
+    for (const f of w.fixtures) if (f.competitionId===t.id && ['league','groups'].includes(f.stage) && f.homeGoals!==null && f.awayGoals!==null && points.has(f.home) && points.has(f.away)) {
+      points.set(f.home,points.get(f.home)!+(f.homeGoals>f.awayGoals?3:f.homeGoals===f.awayGoals?1:0)); points.set(f.away,points.get(f.away)!+(f.awayGoals>f.homeGoals?3:f.homeGoals===f.awayGoals?1:0));
+      gd.set(f.home,gd.get(f.home)!+f.homeGoals-f.awayGoals); gd.set(f.away,gd.get(f.away)!+f.awayGoals-f.homeGoals);
+    }
+    return {points,gd};
+  };
+  const minis = rule?.ranking==='head-to-head' ? new Map([...tied].map(([pts,ids])=>[pts,mini(ids)])) : null;
+  return [...rows.values()].sort((a,b)=>{
+    if(a.points!==b.points)return b.points-a.points;
+    if(rule?.ranking==='wins' && a.won!==b.won)return b.won-a.won;
+    const m=minis?.get(a.points); if(m){const diff=m.points.get(b.teamId)!-m.points.get(a.teamId)! || m.gd.get(b.teamId)!-m.gd.get(a.teamId)!;if(diff)return diff;}
+    const general=(b.goalsFor-b.goalsAgainst)-(a.goalsFor-a.goalsAgainst) || b.goalsFor-a.goalsFor;if(general)return general;
+    if(rule?.ranking==='wins' && tied.get(a.points)?.length===2){const head=mini([a.teamId,b.teamId]);const diff=head.points.get(b.teamId)!-head.points.get(a.teamId)!;if(diff)return diff;}
+    return compare(a.teamId,b.teamId);
+  });
 }
 const calendarIndexes = new WeakMap<CompetitionWorld, { busy: Set<string>; counters: Map<string, number>; ids: Set<string> }>();
 function calendarIndex(w: CompetitionWorld) {
@@ -46,30 +69,51 @@ function fixture(w: CompetitionWorld, t: Tournament, home: string, away: string,
   index.busy.add(`${t.level}:${home}:${date}`); index.busy.add(`${t.level}:${away}:${date}`);
   w.fixtures.push({ id, competitionId: t.id, home, away, date, round, stage, group, homeGoals: null, awayGoals: null, penalties: null });
 }
-function roundRobin(w: CompetitionWorld, t: Tournament, ids: string[], firstDate: string, stage: string, rounds?: number, group = -1, secondLeg = false) {
+function roundRobin(w: CompetitionWorld, t: Tournament, ids: string[], firstDate: string, stage: string, rounds?: number, group = -1, secondLeg: boolean | number = false) {
   const rotation: (string | null)[] = [...ids]; if (rotation.length % 2) rotation.push(null);
   const base: { home: string; away: string; round: number }[] = [];
   for (let round = 0; round < rotation.length - 1; round++) {
     for (let i = 0; i < rotation.length / 2; i++) { const a = rotation[i], b = rotation[rotation.length - 1 - i]; if (a && b) base.push({ home: round % 2 ? b : a, away: round % 2 ? a : b, round }); }
     rotation.splice(1, 0, rotation.pop()!);
   }
-  const schedule = secondLeg ? [...base, ...base.map(f => ({ home: f.away, away: f.home, round: f.round + rotation.length - 1 }))] : base;
+  const legs = typeof secondLeg === 'number' ? secondLeg : secondLeg ? 2 : 1;
+  const schedule = Array.from({length:legs},(_,leg)=>base.map(f=>({home:leg%2?f.away:f.home,away:leg%2?f.home:f.away,round:f.round+leg*(rotation.length-1)}))).flat();
+  // Orient the even-degree league-phase graph along Euler circuits: exactly 4/4
+  // (or 3/3) home/away games, preserving each round's distinct opponents.
+  if(t.regulationId?.startsWith('continental-v1:') && stage==='league' && rounds && ids.length===36){
+    const edges=schedule.filter(f=>f.round<rounds), adjacent=new Map(ids.map(id=>[id,[] as number[]]));
+    edges.forEach((f,i)=>{adjacent.get(f.home)!.push(i);adjacent.get(f.away)!.push(i);});
+    const used=new Set<number>();
+    for(const start of ids){const stack=[start];while(stack.length){const node=stack.at(-1)!;const list=adjacent.get(node)!;while(list.length&&used.has(list.at(-1)!))list.pop();const index=list.pop();if(index===undefined){stack.pop();continue;}used.add(index);const edge=edges[index]!,next=edge.home===node?edge.away:edge.home;edge.home=node;edge.away=next;stack.push(next);}}
+  }
   for (const f of schedule) if (rounds === undefined || f.round < rounds) fixture(w, t, f.home, f.away, addDays(firstDate, f.round * (t.key.includes('champions') || t.key === 'europa' || t.key === 'conference' ? 14 : 7)), f.round + 1, stage, group);
+}
+export function isTwoLegged(t: Tournament, size: number): boolean {
+  return !!t.regulationId?.startsWith('continental-v1:') && (size > 2 || ['central-american','caribbean'].includes(t.key)) && ['champions','europa','conference','libertadores','sudamericana','concacaf-champions','central-american','caribbean'].includes(t.key);
 }
 function knockout(w: CompetitionWorld, t: Tournament, ids: string[], date: string, round: number, stage = 'knockout') {
   const size = 2 ** Math.ceil(Math.log2(ids.length)), byes = size - ids.length;
   t.waiting = ids.slice(0, byes);
   const paired = ids.slice(byes);
-  for (let i = 0; i < paired.length; i += 2) fixture(w, t, paired[i]!, paired[paired.length - 1 - i]!, date, round, stage);
+  for (let i = 0; i < paired.length; i += 2) {
+    const home=paired[i]!,away=paired[paired.length-1-i]!;
+    fixture(w,t,home,away,date,round,stage);
+    if(isTwoLegged(t,ids.length))fixture(w,t,away,home,addDays(date,7),round,stage);
+  }
 }
 function addTournament(w: CompetitionWorld, key: string, name: string, ids: string[], format: Tournament['format'], level: Tournament['level'], date: string, rounds?: number) {
   const t: Tournament = { id: `${w.season}:${key}`, key, name, season: w.season, level, format, phase: ids.length < 2 ? 'unavailable' : format === 'league' || format === 'league-knockout' ? 'league' : format === 'groups' ? 'groups' : 'knockout', participants: [...ids], groups: [], waiting: [], champion: null,
     notice: 'Calendário, participantes e classificações simulados no save. Formatos compactos; não é o regulamento oficial integral.' };
+  const rule = level==='senior' ? regulationFor(key) : undefined;
+  if(rule) { t.regulationId=rule.id; t.name=rule.name; t.notice=rule.engine==='reference-only'?'Formato especial catalogado; execução ainda simplificada. Consulte as regras de referência abaixo.':'Formato de referência aplicado ao calendário. Datas e participantes são simulados; regulamento 2026/27 não conferido.'; }
+  if(['champions','europa','conference','libertadores','sudamericana','concacaf-champions','central-american','caribbean','world-cup'].includes(key)) {
+    t.regulationId=`continental-v1:${key}`; t.notice='Formato principal de referência aplicado. Participantes, sorteio, vagas e datas simulados; fases preliminares e critérios finais não reproduzidos integralmente.';
+  }
   w.tournaments.push(t); if (ids.length < 2) { t.notice = 'Clubes/seleções insuficientes no pacote para realizar esta edição.'; return; }
-  if (t.phase === 'league') roundRobin(w, t, ids, date, 'league', rounds);
+  if (t.phase === 'league') roundRobin(w,t,ids,date,'league',rounds,-1,rule?.engine==='scottish-split'?3:!!rule && ['double-round-robin','austrian-split'].includes(rule.engine));
   else if (t.phase === 'groups') {
     // Seeded pots distribute the strongest teams across groups instead of stacking them together.
-    const count = Math.max(1, Math.ceil(ids.length / 4)); t.groups = Array.from({ length: count }, () => []);
+    const count = Math.max(1, Math.ceil(ids.length / (['central-american','caribbean'].includes(key)?5:4))); t.groups = Array.from({ length: count }, () => []);
     ids.forEach((id, i) => t.groups[i % count]!.push(id));
     t.groups.forEach((group, i) => roundRobin(w, t, group, date, 'groups', undefined, i, ['libertadores','sudamericana'].includes(key)));
   } else knockout(w, t, ids, date, 1);
@@ -89,8 +133,8 @@ export function createWorld(clubs: readonly Club[], seed: number, date: string, 
     const national = ranked.filter(c => c.country === country).map(c => c.id);
     if (national.length) addTournament(w, `youth:${country}`, `Liga da base · ${country}`, national, 'league', 'youth', addDays(`${season}-07-01`, 7), Math.min(18, national.length - 1));
     const cupIds = ranked.filter(c => (membershipFor(c)?.leagueCountry === 'Inglaterra' ? 'Inglaterra' : c.country) === country).map(c => c.id);
-    const cupNames: Record<string,string> = { Brasil:'Copa do Brasil', Inglaterra:'FA Cup', Espanha:'Copa del Rey', Itália:'Coppa Italia', Alemanha:'DFB-Pokal', França:'Coupe de France', Portugal:'Taça de Portugal', México:'Copa nacional · México (simulada)', Canadá:'Canadian Championship', 'Estados Unidos':'US Open Cup' };
-    addTournament(w, `cup:${country}`, cupNames[country] ?? `Copa nacional · ${country}`, cupIds, 'cup', 'senior', startDate(season, 10, 7));
+    const cupName=REAL_CUP_NAMES[country];
+    if(cupName)addTournament(w,`cup:${country}`,cupName,cupIds,'cup','senior',startDate(season,10,7));
   }
   for (const snapshot of LEAGUE_SNAPSHOTS) if (snapshot.division > 1) {
     const ids = ranked.filter(c => membershipFor(c)?.key === snapshot.key).map(c => c.id);
@@ -102,7 +146,7 @@ export function createWorld(clubs: readonly Club[], seed: number, date: string, 
   }
   for (const t of w.tournaments) {
     const snapshot = LEAGUE_SNAPSHOTS.find(s => s.key === t.key);
-    if (snapshot && t.participants.length) t.notice += ` Participantes de referência: ${snapshot.season}; cadastro pode ser parcial e não confirma a edição 2026/27.`;
+    if (snapshot && t.participants.length) t.notice += ` Participantes de referência: ${snapshot.season}; ${t.participants.length}/${regulationFor(t.key)?.expected ?? snapshot.clubIds.length} clubes de referência; cadastro pode ser parcial e não confirma a edição 2026/27.`;
   }
   for (const [state, meta] of Object.entries(BRAZIL_STATES)) addTournament(w, `state:${state}`, `Campeonato ${meta.name}`, ranked.filter(c => c.country === 'Brasil' && brazilState(c.name) === state).map(c => c.id), 'cup', 'senior', startDate(season, 1, 10));
   const european = ranked.filter(c => EUROPE.includes(c.country) && associationFor(c.country)?.continentalEligible !== false && (membershipFor(c)?.division ?? 1) === 1); const used = new Set<string>();
@@ -139,6 +183,19 @@ export function createWorld(clubs: readonly Club[], seed: number, date: string, 
   return w;
 }
 function winner(f: Fixture): string { requireRule(f.homeGoals !== null && f.awayGoals !== null, 'Partida não encerrada.'); return f.homeGoals === f.awayGoals ? (f.penalties![0] > f.penalties![1] ? f.home : f.away) : f.homeGoals > f.awayGoals ? f.home : f.away; }
+/** Opposite legs share round and opponents. A first-leg draw never triggers penalties. */
+export function tieMatches(w:CompetitionWorld,f:Fixture):Fixture[]{
+  return w.fixtures.filter(x=>x.competitionId===f.competitionId && x.round===f.round && x.stage===f.stage && ((x.home===f.home&&x.away===f.away)||(x.home===f.away&&x.away===f.home))).sort((a,b)=>compare(a.date,b.date)||compare(a.id,b.id));
+}
+export function aggregate(w:CompetitionWorld,f:Fixture):[number,number]{
+  return tieMatches(w,f).reduce<[number,number]>((sum,x)=>[sum[0]+(x.home===f.home?x.homeGoals??0:x.awayGoals??0),sum[1]+(x.home===f.home?x.awayGoals??0:x.homeGoals??0)],[0,0]);
+}
+function tieWinners(w:CompetitionWorld,t:Tournament,matches:Fixture[]):string[]{
+  if(!t.regulationId?.startsWith('continental-v1:'))return matches.map(winner);
+  const seen=new Set<string>(), winners:string[]=[];
+  for(const f of matches){if(seen.has(f.id))continue;const legs=tieMatches(w,f);legs.forEach(x=>seen.add(x.id));const last=legs.at(-1)!;const [h,a]=aggregate(w,last);winners.push(h===a?(last.penalties![0]>last.penalties![1]?last.home:last.away):h>a?last.home:last.away);}
+  return winners;
+}
 function grant(w: CompetitionWorld, t: Tournament, kind: Award['kind'], name: string, player: PlayerStats | null, teamId: string, value: number) {
   const id = `${t.id}:${kind}:${player?.playerId ?? teamId}`;
   if (!w.awards.some(a => a.id === id)) w.awards.push({ id, season: w.season, competitionId: t.id, kind, name, playerId: player?.playerId ?? null, playerName: player?.name ?? '', teamId, value });
@@ -165,7 +222,14 @@ function progress(w: CompetitionWorld, t: Tournament) {
   const all = w.fixtures.filter(f => f.competitionId === t.id);
   const current = all.filter(f => f.stage === t.phase && (t.phase === 'knockout' ? f.round === Math.max(...all.map(f => f.round)) : true));
   if (!current.length || current.some(f => f.homeGoals === null)) return;
-  if (t.format === 'league') { t.phase = 'complete'; t.champion = standings(w, t)[0]!.teamId; awardTournament(w, t); return; }
+  if (t.format === 'league') {
+    const rule=regulationById(t.regulationId);
+    if(t.phase==='league' && rule && ['scottish-split','austrian-split'].includes(rule.engine) && t.participants.length===rule.expected){
+      const ranked=standings(w,t).map(r=>r.teamId);t.groups=[ranked.slice(0,6),ranked.slice(6)];t.phase='groups';
+      const date=addDays(current.reduce((max,f)=>f.date>max?f.date:max,current[0]!.date),7);
+      t.groups.forEach((ids,i)=>roundRobin(w,t,ids,date,'groups',undefined,i,rule.engine==='austrian-split'));return;
+    }
+    t.phase = 'complete'; t.champion = standings(w,t,t.groups.length?0:undefined)[0]!.teamId; awardTournament(w, t); return; }
   let qualified: string[];
   if (t.phase === 'league') {
     const ranked = standings(w, t).map(r => r.teamId);
@@ -174,10 +238,10 @@ function progress(w: CompetitionWorld, t: Tournament) {
   } else if (t.phase === 'groups') {
     qualified = t.groups.flatMap((_, i) => standings(w, t, i).slice(0, 2).map(r => r.teamId));
     if (t.key === 'world-cup') {
-      const thirds = t.groups.flatMap((_, i) => standings(w, t, i)[2] ?? []).sort((a, b) => b.points - a.points || (b.goalsFor - b.goalsAgainst) - (a.goalsFor - a.goalsAgainst) || compare(a.teamId, b.teamId));
+      const thirds = t.groups.flatMap((_, i) => standings(w, t, i)[2] ?? []).sort((a, b) => b.points - a.points || (b.goalsFor - b.goalsAgainst) - (a.goalsFor - a.goalsAgainst) || (t.regulationId ? b.goalsFor-a.goalsFor : 0) || compare(a.teamId, b.teamId));
       qualified.push(...thirds.slice(0, Math.max(0, 32 - qualified.length)).map(r => r.teamId));
     }
-  } else qualified = [...t.waiting, ...current.map(winner)];
+  } else qualified = [...t.waiting, ...tieWinners(w,t,current)];
   if (qualified.length === 1) { t.phase = 'complete'; t.champion = qualified[0]!; t.waiting = []; awardTournament(w, t); return; }
   t.phase = 'knockout'; knockout(w, t, qualified, addDays(current.reduce((date, f) => f.date > date ? f.date : date, current[0]!.date), t.level === 'national' ? 3 : 7), Math.max(...all.map(f => f.round)) + 1);
 }
@@ -214,7 +278,11 @@ export function advanceWorld(s: CareerState, through: string, played?: { fixture
     const controlled = played && played.fixtureId === f.id ? played : null;
     const playerTeam = t.level === 'national' ? `nation:${s.player.nationality}` : s.contract?.clubId;
     if (controlled) { requireRule(playerTeam === f.home || playerTeam === f.away, 'Atleta fora desta partida.'); if (playerTeam === f.home) f.homeGoals += controlled!.performance.goals + controlled!.performance.assists; else f.awayGoals += controlled!.performance.goals + controlled!.performance.assists; }
-    if (['knockout', 'playoff'].includes(f.stage) && f.homeGoals === f.awayGoals) f.penalties = random(0, 1) ? [5, 4] : [4, 5];
+    if (['knockout','playoff'].includes(f.stage)) {
+      const legs=t.regulationId?.startsWith('continental-v1:')?tieMatches(w,f):[f];
+      const [h,a]=t.regulationId?.startsWith('continental-v1:')?aggregate(w,f):[f.homeGoals,f.awayGoals];
+      if(legs.at(-1)!.id===f.id && h===a)f.penalties=random(0,1)?[5,4]:[4,5];
+    }
     for (const team of [home, away]) {
       let goals = team.id === home.id ? f.homeGoals : f.awayGoals;
       const conceded = team.id === home.id ? f.awayGoals : f.homeGoals;

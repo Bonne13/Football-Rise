@@ -31,7 +31,7 @@ test('knockout byes, progression, ties and champion work with non-power-of-two p
 test('league tables account for every result and calendars never double-book a team within its level', () => {
   const s = state(Array.from({ length: 6 }, (_, i) => club(`c${i}`)));
   advance(s, '2027-06-30'); const table = standings(s.world, get(s, 'league:Brasil'));
-  assert.equal(table.length, 6); assert.ok(table.every(t => t.played === 5));
+  assert.equal(table.length, 6); assert.ok(table.every(t => t.played === 10));
   assert.equal(table.reduce((n, t) => n + t.goalsFor, 0), table.reduce((n, t) => n + t.goalsAgainst, 0));
   assert.ok(table.every(t => t.points === t.won * 3 + t.drawn && t.played === t.won + t.drawn + t.lost));
   const busy = new Set<string>();
