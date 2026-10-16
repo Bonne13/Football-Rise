@@ -16,3 +16,15 @@ test('pull starts at zero, reaches the selected target at full power, and clamps
   assert.equal(pulledShot(origin, target, 0, -20, 60).power, 0);
   assert.ok(pulledShot(origin, target, 10, 60, 60).aim.x < target.x);
 });
+
+test('free pull needs a backward gesture and permits steering beyond the posts', async () => {
+  const { freePullShot } = await import('./aim-state.js');
+  const origin = { x: 440, y: 950 };
+  for (const dy of [-100, 0, 11]) assert.equal(freePullShot(origin, 30, dy, 120, false).active, false);
+  const left = freePullShot(origin, 50, 90, 120, false);
+  assert.equal(left.active, true); assert.equal(left.power, .75); assert.ok(left.aim.x < 240);
+  assert.equal(freePullShot(origin, -50, 90, 120, false).aim.x, 815);
+  assert.equal(freePullShot(origin, 0, 240, 120, false).power, 1);
+  assert.equal(freePullShot(origin, NaN, 90, 120, false).active, false);
+  assert.equal(freePullShot(origin, 0, 120, 120, true).aim.y, -150);
+});

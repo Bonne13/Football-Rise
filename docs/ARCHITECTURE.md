@@ -115,3 +115,12 @@ O campo deixou de disparar por distância de arrasto. `src/ui/aim-state.ts` defi
 A apresentação usa gramado com ruído procedural e filtragem anisotrópica, céu em gradiente, iluminação com sombras limitadas a 1024 px, materiais de maior detalhe, arquibancada coberta, placares de marca própria e uniformes/cabelo/chuteiras procedurais. A câmera amplia o gol durante a seleção; a preparação e o voo usam o enquadramento por trás do jogador. Um marcador HTML de tamanho legível acompanha a projeção 3D. Nenhum asset externo protegido foi adicionado.
 
 `npm run test:browser` mantém uma regressão reproduzível por eventos de toque em tela de celular, além dos testes de validação e potência. O servidor e o navegador do teste são fechados ao terminar. A lógica da carreira e seu formato de save não mudaram nesta revisão.
+
+
+## Controle móvel contínuo e pausa
+
+A interface também aceita puxar para trás no campo: após uma zona morta de 12 px, a bola aparece, a distância vertical controla potência e o deslocamento horizontal reverso controla direção, incluindo finalizações fora das traves. Soltar executa; cancelar não executa. `freePullShot` mantém essa transformação testável e separada do domínio. Tocar em um alvo continua como alternativa para selecionar contato/efeito e finalizar pela bola ampliada.
+
+Treinos e oportunidades de partida ocupam o viewport, respeitando as áreas seguras do celular. A pausa oferece retomada, som e saída; fica disponível entre ações e durante condução/corrida, e o navegador também pausa ao perder foco ou ocultar a aba. Pausa congela o relógio de domínio e de apresentação, cancela gestos e suspende áudio. Ao sair, uma tentativa resolvida é gravada uma única vez antes da navegação; tentativas incompletas recomeçam. Falha de gravação mantém o menu aberto. A preferência de som usa chave separada, sem alterar o save v1. Os efeitos sonoros são sintetizados localmente por Web Audio após interação.
+
+A animação 3D deriva deslocamento dos atletas para passada, direção, braços e oscilação do corpo; inclui preparação, aproximação e acompanhamento do chute e alcance do goleiro. Esse estado visual não decide gols, colisões ou notas. Não representa ainda uma partida completa com 22 atletas.

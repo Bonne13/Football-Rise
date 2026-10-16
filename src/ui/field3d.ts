@@ -160,7 +160,7 @@ export class Field3D {
     });
   }
   private setLine(line: T.Line, points: T.Vector3[]) { line.geometry.dispose(); line.geometry = new THREE.BufferGeometry().setFromPoints(points); line.computeLineDistances(); }
-  render(t: Trial | null, aim: Point | null, curve: number, lift: number, phase: ShotPhase = 'preparing') {
+  render(t: Trial | null, aim: Point | null, curve: number, lift: number, phase: ShotPhase = 'preparing', animationTime = 0) {
     if (!t) { this.renderer.render(this.scene, this.camera); return; }
     this.resize(); this.actors.forEach(a => { a.visible = false; }); this.cones.forEach(a => { a.visible = false; }); this.gates.forEach(a => { a.visible = false; });
     this.line.visible = t.kind === 'vision'; let count = 0;
@@ -180,7 +180,8 @@ export class Field3D {
       t.obstacles.filter(o => !o.passed && o.distance - t.distance < 55).forEach((o, i) => this.obstacle(i, { x: [147, 440, 733][o.lane]!, y: 1150 - (o.distance - t.distance) * 20 }));
     } else {
       this.ball.visible = true;
-      const striker = this.actor(count++, { x: t.origin.x - 40, y: t.origin.y + 25 }, '#d9fa6b');
+      const approach = t.shot ? Math.sin(Math.min(1, t.shot.elapsed / t.shot.duration) * Math.PI / 2) : 0;
+      const striker = this.actor(count++, { x: t.origin.x - 40 + approach * 30, y: t.origin.y + 25 - approach * 30 }, '#d9fa6b');
       if (t.kind === 'pass' || t.kind === 'vision') { t.defenders.forEach(p => this.actor(count++, p, '#dd5860')); (t.kind === 'vision' ? t.mates : [teammateAt(t.time)]).forEach(p => this.actor(count++, p, '#65beed')); }
       else { const keeper = this.actor(count++, { x: t.shot?.keeper ?? keeperAt(t.time), y: 95 }, '#f7af65'); if (t.shot && t.outcome === 'save') keeper.rotation.z = -.35; else keeper.rotation.z = 0; if (t.kind === 'freekick') [360, 410, 460, 510].forEach(x => this.actor(count++, { x, y: 720 }, '#dd5860')); }
       if (t.shot) {
@@ -198,6 +199,31 @@ export class Field3D {
     this.aimLine.visible = !!aim && !t.shot && !['speed', 'technique'].includes(t.kind);
     this.aimMark.visible = this.aimLine.visible;
     if (aim && this.aimLine.visible) { this.setLine(this.aimLine, this.path(t, aim, curve, lift)); this.aimMark.position.copy(this.vector(aim, t.kind !== 'pass' && t.kind !== 'vision')); this.aimMark.rotation.x = t.kind === 'pass' || t.kind === 'vision' ? -Math.PI / 2 : 0; }
+    this.actors.forEach((actor, index) => {
+      if (!actor.visible) return;
+      const previous = actor.userData.attempt === `${t.kind}:${t.attempt}` ? actor.userData.previous as { x: number; z: number; time: number } | undefined : undefined;
+      const elapsed = previous ? animationTime - previous.time : 0;
+      const dx = previous ? actor.position.x - previous.x : 0, dz = previous ? actor.position.z - previous.z : 0;
+      const moving = !t.resolved && ((elapsed > 0 && elapsed < .15 && Math.hypot(dx, dz) / elapsed > .1) || (index === 0 && t.kind === 'speed' && t.started));
+      const stride = Math.sin(animationTime * (t.kind === 'speed' ? 17 : 12));
+      if (index === 0 && t.kind === 'speed' && previous && elapsed > 0) { const blend = 1 - Math.exp(-elapsed * 16); actor.position.x = previous.x + dx * blend; }
+      actor.position.y = moving ? Math.abs(stride) * .065 : Math.sin(animationTime * 2 + index) * .012;
+      if (moving && Math.hypot(dx, dz) > .001) actor.rotation.y = Math.atan2(-dx, -dz);
+      else if (!moving) actor.rotation.y *= .9;
+      actor.children[2]!.rotation.x = moving ? stride * .65 : 0;
+      if (!(index === 0 && t.shot)) actor.children[3]!.rotation.x = moving ? -stride * .65 : phase === 'preparing' && index === 0 ? .35 : 0;
+      actor.children[4]!.rotation.x = moving ? -stride * .5 : .08;
+      actor.children[5]!.rotation.x = moving ? stride * .5 : -.08;
+      if (index === 1 && t.shot && !['pass', 'vision'].includes(t.kind)) {
+        const reach = Math.min(1, t.shot.elapsed / t.shot.duration);
+        const side = Math.sign(t.shot.end.x - t.shot.keeper);
+        actor.rotation.z = -side * Math.sin(reach * Math.PI / 2) * .5;
+        actor.children[4]!.rotation.z = -.15 - reach * .9;
+        actor.children[5]!.rotation.z = .15 + reach * .9;
+      } else { actor.children[4]!.rotation.z = -.15; actor.children[5]!.rotation.z = .15; }
+      actor.userData.attempt = `${t.kind}:${t.attempt}`;
+      actor.userData.previous = { x: actor.position.x, z: actor.position.z, time: animationTime };
+    });
     this.renderer.render(this.scene, this.camera);
     if (this.contactCanvas.getClientRects().length) this.contactRenderer.render(this.contactScene, this.contactCamera);
   }
