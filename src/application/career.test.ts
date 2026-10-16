@@ -99,3 +99,13 @@ test('invalid and unsupported saves are rejected without silently resetting', ()
   for (const bad of [{ ...s, schemaVersion: 99 }, { ...s, contract: null }, { ...s, date: '2026-02-30' }, { ...s, extra: 1 }, { ...s, development: { ...s.development, appearances: 10 } }]) assert.throws(() => deserializeSave(JSON.stringify(bad)));
   s.player.attributes.passing = NaN; assert.throws(() => serializeSave(s));
 });
+
+test('starting club is chosen before assessment and training, always in the youth team at 14–16', () => {
+  for (const startingAge of [14,15,16] as const) {
+    let s=createCareer({...input,startingAge,startingClubId:'vale'});
+    assert.equal(s.stage,'created');assert.equal(s.contract!.clubId,'vale');assert.equal(s.contract!.team,'youth');assert.equal(s.trainingSessions,0);assert.equal(s.assessment,null);
+    assert.deepEqual(deserializeSave(serializeSave(s)),s);assert.throws(()=>advanceCareer(s,{type:'promote'}));
+    s=advanceCareer(s,{type:'assess',performances});s=advanceCareer(s,{type:'train',focus:'passing'});assert.equal(s.stage,'contracted');assert.equal(advanceCareer(s,{type:'prepare'}).stage,'ready');
+  }
+  assert.throws(()=>createCareer({...input,startingClubId:'missing'}));
+});

@@ -23,3 +23,12 @@ Sessões antigas com passe → finalização → condução → falta continuam 
 ## Verificação
 
 Testes do domínio cobrem aceleração/frenagem, atributos, circuitos completos, pressão e perda de posse, condução bem-sucedida, continuidade física da bola e retomada de sessões antigas. `npm run test:dribble` usa Chromium para jogar os três circuitos por teclado, testar pausa/cancelamento, passar da condução ao chute, conferir a etapa única de mira/curva e controlar direcional/aceleração com dois dedos no celular. Capturas são feitas no próprio renderer do jogo.
+
+## Corrida analógica, recepção e goleiros
+O treino de velocidade aceita o direcional flutuante: intensidade do arrasto determina a fração da velocidade máxima por atributo; soltar desacelera. A troca de faixa desloca fisicamente o atleta com aceleração lateral, e as colisões usam sua posição intermediária. A câmera não salta de faixa. Na condução, técnica também influencia o limite de ritmo com a bola. A animação usa oito poses e cadência ligada à distância, com inclinação lateral moderada.
+
+A prévia de chute cresce com a força, sem alvo na ponta; faltas mostram apenas parte da trajetória. O atributo de finalização/bola parada determina uma dispersão reproduzível por seed. O contato lateral curva para o lado indicado na bola. O controle ampliado é separado da esfera física de raio 11 cm no campo.
+
+Finalizações alternam cruzamento esquerdo, direito e bola quicando. Após confirmar mira e força, a bola chega e a indicação AGORA abre uma janela dependente de técnica. Antecipar ou perder a janela encerra a tentativa sem gol; pausa e inspeção congelam a recepção. Cabeceio, bicicleta e voleio acompanham o tipo de chegada e a altura do contato alimenta a trajetória física. Tentativas erradas podem ser repetidas em treino/avaliação; partidas preservam suas consequências e acertos não oferecem repetição.
+
+Goleiros observam a bola em voo com reação de 180 ms, antecipação curta, velocidade e alcance limitados. A defesa exige encontro físico antes da linha do gol, também nas faltas. Chutes lentos permitem mais recuperação; cantos, altura e curva podem superar o alcance. Não há decisão de defesa garantida no momento do chute. Esta IA continua sendo a do protótipo de oportunidades, sem alegar equivalência integral ao Football Legacy.

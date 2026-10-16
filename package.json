@@ -8,6 +8,7 @@
     "test": "npm run build && node --test \"dist/**/*.test.js\"",
     "check": "tsc -p tsconfig.json --noEmit",
     "build:web": "npm run build && node scripts/build-web.mjs",
+    "test:contact": "npm run build:web && node scripts/test-contact.cjs",
     "test:menu": "npm run build:web && node scripts/test-main-menu.cjs",
     "test:browser": "npm run build:web && node scripts/test-browser.cjs",
     "test:desktop": "npm run build:web && node scripts/test-desktop.cjs",

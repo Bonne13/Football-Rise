@@ -106,3 +106,10 @@ Três circuitos distintos, portões físicos numerados, ritmo analógico e acele
 - Slots independentes com importação/exportação, exclusão confirmada e migração não destrutiva do save anterior.
 - Configurações compartilhadas com o pause; conquistas derivadas de avaliação, treinos, contrato, partidas, gols, assistências e premiações.
 - Validação: testes de regras e persistência alternativa; teste de navegador `test:menu` em layout desktop/celular e integração com campo.
+
+### Escolha inicial da base e controles por gesto
+- País → liga/divisão → clube da base antes da avaliação e dos treinos; idades iniciais 14–16 sem acesso imediato ao principal.
+- Número inicial atribuído no clube, três sugestões livres e disputa de números ocupados por atuações, confiança e habilidade.
+- Navegação sem recarregar o documento, preservação de formulários, mira proporcional à força e curva corrigida.
+- Recepção cronometrada com três trajetórias, repetição apenas de erros em treinos, goleiros reativos e faltas com prévia parcial.
+- Corrida analógica com velocidade limitada por atributos, transição física entre faixas e oito poses de corrida.

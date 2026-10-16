@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createCareer, advanceCareer } from '../../application/career.js';
 import { ATTRIBUTES } from '../career/state.js';
 import { deserializeSave, serializeSave } from '../../persistence/save.js';
-import { numberAvailability, joinShirt } from './shirt.js';
+import { numberAvailability, joinShirt, welcomeNumbers } from './shirt.js';
 function contracted() {
   let s = createCareer({ name: 'Alex', nationality: 'Brasil', position: 'ST', preferredFoot: 'right', seed: 42 });
   s = advanceCareer(s, { type: 'assess', performances: Object.fromEntries(ATTRIBUTES.map(k => [k, 80])) as typeof s.player.attributes });
@@ -12,7 +12,8 @@ function contracted() {
 }
 test('free shirts are available, occupied shirts require both trust and ability without mutating a rejected save', () => {
   const s = contracted(), before = serializeSave(s);
-  assert.equal(s.shirt.number, 24);
+  assert.ok(welcomeNumbers(s).includes(s.shirt.number));
+  const assigned = s.shirt.number;
   assert.equal(advanceCareer(s, { type: 'shirt-number', number: 99 }).shirt.number, 99);
   assert.throws(() => advanceCareer(s, { type: 'shirt-number', number: 10 }), /confiança/);
   assert.equal(serializeSave(s), before);
@@ -24,9 +25,10 @@ test('free shirts are available, occupied shirts require both trust and ability 
   s.coachTrust = requirement.requiredTrust - 1;
   assert.equal(numberAvailability(s, 10).allowed, false);
   s.coachTrust = requirement.requiredTrust;
+  s.development.recentRatings = [8,8,8,8];
   const result = advanceCareer(s, { type: 'shirt-number', number: 10 });
   assert.equal(result.shirt.number, 10);
-  assert.equal(result.shirt.holders.find(h => h.id === requirement.holder!.id)!.number, 24);
+  assert.equal(result.shirt.holders.find(h => h.id === requirement.holder!.id)!.number, assigned);
   assert.equal(new Set([result.shirt.number, ...result.shirt.holders.map(h => h.number)]).size, 24);
 });
 test('number and kit choices validate integers, persist, and get reassigned on entering a new squad', () => {
@@ -53,4 +55,10 @@ test('version 1 saves migrate deterministically without losing career, results o
   assert.deepEqual(migrated.development, s.development); assert.equal(migrated.rng, s.rng);
   assert.equal(migrated.shirt.number, 24); assert.deepEqual(deserializeSave(serializeSave(migrated)), migrated);
   assert.deepEqual(deserializeSave(JSON.stringify({ ...legacy, schemaVersion: 1 })), migrated);
+});
+
+test('new club assignment offers three distinct free choices and occupied numbers require recent performance', () => {
+  const s=contracted();const choices=welcomeNumbers(s);assert.equal(choices.length,3);assert.equal(new Set(choices).size,3);assert.ok(choices.every(n=>!s.shirt.holders.some(h=>h.number===n)));
+  s.coachTrust=100;for(const k of ATTRIBUTES)s.player.attributes[k]=99;
+  assert.equal(numberAvailability(s,10).allowed,false);s.development.recentRatings=[5,5,5,5];assert.equal(numberAvailability(s,10).allowed,false);s.development.recentRatings=[8,8,8,8];assert.equal(numberAvailability(s,10).allowed,true);
 });

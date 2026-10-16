@@ -37,3 +37,7 @@ export function restoreSession(text: string, expected: DrillSession): DrillSessi
   value.results.forEach((r, i) => { requireRule(r.kind === value.sequence[i] && ['goal', 'save', 'wide', 'wall', 'received', 'intercepted', 'offside', 'complete', 'timeout'].includes(String(r.outcome)), 'Resultado inválido.'); bounded(r.score, 0, 100);if(r.carry!==undefined){requireRule(r.kind==='technique'&&r.outcome==='complete'&&r.carry&&typeof r.carry==='object','Saída de condução inválida.');bounded(r.carry.x,20,860);bounded(r.carry.y,100,2000);} });
   return value;
 }
+
+export function canRetryTrial(mode: DrillSession['mode'], trial: Trial): boolean {
+  return mode !== 'match' && trial.resolved && !['goal', 'received'].includes(trial.outcome ?? '') && (trial.outcome !== 'complete' || trial.collisions > 0);
+}

@@ -27,7 +27,7 @@ const server = createServer(async (req, res) => {
     await page.goto(origin);await page.locator('[data-action="new"]').first().click();
     await page.getByRole('button', { name: 'Usar base comunitária' }).click();
     await page.waitForFunction(() => localStorage.getItem('football-rise.data-pack.v1'));
-    await page.getByText('Consultar clubes e jogadores', { exact: true }).click();
+    await page.locator('#club-catalog').waitFor();
     await page.getByLabel('Clube do catálogo').selectOption({ label: 'Real Madrid · Espanha' });
     assert.match(await page.locator('#pack-roster').innerText(), /Mbapp/);
     // Build a legitimate contracted fixture through the public application API.

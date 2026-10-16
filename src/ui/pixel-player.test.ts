@@ -6,9 +6,9 @@ test('pixel athlete shows front, back and both sides relative to the camera', ()
   assert.equal(spriteFacing(Math.PI / 2, 0), 3); assert.equal(spriteFacing(-Math.PI / 2, 0), 2);
   assert.equal(spriteFacing(Math.PI * 2, 0), 1);
 });
-test('pixel animation cycles four running poses, preserves idle and recovers after kicks', () => {
+test('pixel animation cycles eight running poses, preserves idle and recovers after kicks', () => {
   assert.equal(spriteFrame(10, false), 0);
-  assert.deepEqual([0, 1 / 9, 2 / 9, 3 / 9, 4 / 9].map(t => spriteFrame(t, true)), [1, 2, 3, 4, 1]);
+  assert.deepEqual([0, 1 / 14, 2 / 14, 3 / 14, 8 / 14].map(t => spriteFrame(t, true)), [54, 55, 56, 57, 54]);
   assert.equal(spriteFrame(1, true, .1), 5); assert.equal(spriteFrame(1, false, .3), 6);
   assert.equal(spriteFrame(1, false, .3, true), 7); assert.equal(spriteFrame(1, false, .8), 0);
 });

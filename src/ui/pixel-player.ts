@@ -1,5 +1,5 @@
 import type { Kit } from '../data/kits.js';
-export const SPRITE_SIZE = { width: 64, height: 80, frames: 54, directions: 4 } as const;
+export const SPRITE_SIZE = { width: 64, height: 80, frames: 62, directions: 4 } as const;
 export const PLAYER_ANIMATIONS = {
   'assistant-flag': { label: 'Bandeirinha · impedimento', start: 50, count: 4, fps: 5, loop: false },
   header: { label: 'Cabeceio', start: 8, count: 4, fps: 6, loop: true },
@@ -23,7 +23,7 @@ function poseAt(frame: number) {
 }
 export function spriteFrame(time: number, moving: boolean, kick: number | null = null, goalkeeper = false) {
   if (kick !== null && kick >= 0 && kick < .65) return goalkeeper ? 7 : kick < .16 ? 5 : 6;
-  return moving ? 1 + Math.floor(Math.max(0, time) * 9) % 4 : 0;
+  return moving ? 54 + Math.floor(Math.max(0, time) * 14) % 8 : 0;
 }
 /** Rows: front, back, right, left; orientation follows the athlete, not the camera. */
 export function spriteFacing(playerYaw: number, cameraYaw: number) {
@@ -62,10 +62,10 @@ export function paintPixelPlayers(canvas: HTMLCanvasElement, kit: Kit, number: n
     const jump = action === 'header' ? Math.sin(pose.progress * Math.PI) * 8 : action === 'celebrate' ? Math.sin(pose.progress * Math.PI * 2) * 2 : 0;
     const rotation = action === 'bicycle' ? Math.sin(pose.progress * Math.PI) * 1.8 : action === 'injury' ? pose.progress * 1.5 : action === 'volley' ? Math.sin(pose.progress * Math.PI) * -.22 : 0;
     c.translate(24, 32 - jump + (action === 'injury' ? pose.progress * 24 : 0)); c.rotate(rotation); c.translate(-24, -32);
-    const stride = frame >= 1 && frame <= 4 ? [0, -3, 0, 3][frame - 1]! : 0;
-    const bob = frame === 2 || frame === 4 ? -1 : 0;
+    const stride = frame >= 54 ? [0,-2,-4,-2,0,2,4,2][(frame-54)%8]! : frame >= 1 && frame <= 4 ? [0, -3, 0, 3][frame - 1]! : 0;
+    const bob = frame >= 54 ? [0,-1,-2,-1,0,-1,-2,-1][(frame-54)%8]! : frame === 2 || frame === 4 ? -1 : 0;
     const rect = (x: number, y: number, w: number, h: number, color: string) => { c.fillStyle = color; c.fillRect(x, y + bob, w, h); };
-    // Far limbs are shaded; bent knees and alternating boots form a four-frame run cycle.
+    // Far limbs are shaded; bent knees and alternating boots form a eight-frame run cycle.
     const leg = (x: number, offset: number, far: boolean) => {
       if (action === 'volley' && !far && pose.step > 0 && pose.step < 3) { rect(x, 39, 4, 6, skin); rect(x + 3, 38, 9, 4, skin); rect(x + 11, 38, 6, 4, kit.socks); rect(x + 16, 38, 4, 6, '#102133'); return; }
       const knee = !far && (frame === 6 || action === 'volley') ? -7 : action === 'bicycle' ? (far ? 9 : -9) : action === 'injury' ? (far ? -3 : -6) : frame === 5 && !far ? 5 : offset;

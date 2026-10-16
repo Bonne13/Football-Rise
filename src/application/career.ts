@@ -7,9 +7,9 @@ import { calculateOverall, type Attributes, type Position } from '../domain/play
 import { developmentClubs, type ClubDataProvider } from '../data/clubs.js';
 import { assess, recruit } from '../domain/youth/youth.js';
 import { train, type Focus } from '../domain/training/training.js';
-import { sign } from '../domain/transfers/contracts.js';
+import { makeOffer, sign } from '../domain/transfers/contracts.js';
 import { eligible, record } from '../domain/career/progression.js';
-export interface NewCareer { name: string; nationality: string; position: Position; preferredFoot: 'left' | 'right' | 'both'; seed: number; startingAge?: 14 | 15 | 16; shirtNumber?: number; dataPack?: FootballPack }
+export interface NewCareer { name: string; nationality: string; position: Position; preferredFoot: 'left' | 'right' | 'both'; seed: number; startingAge?: 14 | 15 | 16; startingClubId?: string; shirtNumber?: number; dataPack?: FootballPack }
 export type Command = { type: 'practice'; focus: Focus; quality: number } | { type: 'assess'; performances: Attributes } | { type: 'train'; focus: Focus } | { type: 'accept'; offerId: string }
   | { type: 'shirt-number'; number: number } | { type: 'kit'; index: number } | { type: 'performance'; performance: Performance } | { type: 'recover' | 'scout' | 'prepare' | 'promote' | 'advance-week' | 'renew' };
 export function createCareer(input: NewCareer, provider: ClubDataProvider = developmentClubs): CareerState {
@@ -24,11 +24,19 @@ export function createCareer(input: NewCareer, provider: ClubDataProvider = deve
   if (input.dataPack) validateFootballPack(input.dataPack);
   const clubs = structuredClone(input.dataPack ? input.dataPack.clubs.map(p => p.club) : [...provider.loadYouthClubs()]); requireRule(clubs.length > 0, 'Pacote de clubes vazio.');
   const number = input.shirtNumber ?? 10; requireRule(Number.isInteger(number) && number >= 1 && number <= 99, 'Número inválido.');
-  return { schemaVersion: 3, world: createWorld(clubs, input.seed, '2026-07-01'), dataPack: input.dataPack ? structuredClone(input.dataPack) : null, shirt: { preferredNumber: number, number, kitIndex: 0, holders: [] }, coachTrust: 35, seed: input.seed, rng, date: '2026-07-01', stage: 'created',
+  const career: CareerState = { schemaVersion: 3, world: createWorld(clubs, input.seed, '2026-07-01'), dataPack: input.dataPack ? structuredClone(input.dataPack) : null, shirt: { preferredNumber: number, number, kitIndex: 0, holders: [] }, coachTrust: 35, seed: input.seed, rng, date: '2026-07-01', stage: 'created',
     player: { id: `player-${input.seed}`, name: input.name.trim(), nationality: input.nationality.trim(), birthDate: `${2026 - age}-07-01`, position: input.position,
       attributes, potential: potential.value, perceivedPotential: 60, morale: 70, energy: 100, health: 100, reputation: 1 },
     preferredFoot: input.preferredFoot, discipline: 75, trainingSessions: 0, assessment: null, clubs, reports: [], offers: [], contract: null, preparation: null,
     development: { appearances: 0, minutes: 0, goals: 0, assists: 0, recentRatings: [] }, history: [`Carreira iniciada aos ${age} anos na base.`] };
+  if (input.startingClubId) {
+    const club = career.clubs.find(c => c.id === input.startingClubId); requireRule(club, 'Clube inicial inválido.');
+    const offer = makeOffer(career.player,club,'youth'); requireRule(offer, 'A base deste clube não possui vaga ou orçamento. Escolha outro clube.');
+    const result = sign(career.player,club,offer,career.date);
+    career.contract = result.contract; career.clubs = career.clubs.map(c=>c.id===club.id?result.club:c); joinShirt(career,true);
+    career.history.push(`Entrada na base do ${club.name}, antes da avaliação e dos treinos.`);
+  }
+  return career;
 }
 function allowed(state: CareerState, stages: CareerState['stage'][]) { requireRule(stages.includes(state.stage), 'Ação indisponível nesta etapa.'); }
 export function advanceCareer(previous: CareerState, command: Command): CareerState {
@@ -41,7 +49,7 @@ export function advanceCareer(previous: CareerState, command: Command): CareerSt
     case 'train': {
       allowed(s, ['assessed', 'trained', 'contracted', 'active']); const c = s.clubs.find(c => c.id === s.contract?.clubId);
       s.player = train(s.player, command.focus, c?.facilities ?? 40, c?.coach ?? 50, s.discipline, command.type === 'practice' ? command.quality : 100); s.trainingSessions++;
-      if (!s.contract) s.stage = 'trained'; s.history.push(`Treino: ${command.focus}.`); break;
+      if (!s.contract) s.stage = 'trained'; else if (s.stage === 'assessed') s.stage = 'contracted'; s.history.push(`Treino: ${command.focus}.`); break;
     }
     case 'recover': allowed(s, ['assessed', 'trained', 'offers', 'contracted', 'active']); s.player.energy = Math.min(100, s.player.energy + 30); s.history.push('Sessão de recuperação.'); break;
     case 'scout': {
@@ -56,7 +64,7 @@ export function advanceCareer(previous: CareerState, command: Command): CareerSt
       const result = sign(s.player, club, offer, s.date);
       if (s.contract) { const old = s.clubs.find(c => c.id === s.contract?.clubId)!; old.wageBudget += s.contract.weeklyWage; if (s.contract.team === 'youth') old.youthPlaces++; else old.seniorPlaces++; }
       s.clubs = s.clubs.map(c => c.id === club.id ? result.club : c); s.contract = result.contract; s.offers = []; s.preparation = null; s.stage = 'contracted';
-      s.coachTrust = offer.role === 'reserve' ? 50 : 35; joinShirt(s);
+      s.coachTrust = offer.role === 'reserve' ? 50 : 35; joinShirt(s, true);
       s.history.push(`Contrato assinado: ${club.name} (${offer.team === 'youth' ? 'base' : 'principal'}).`); break;
     }
     case 'advance-week': {
@@ -99,7 +107,7 @@ export function advanceCareer(previous: CareerState, command: Command): CareerSt
       const club = s.clubs.find(c => c.id === s.contract?.clubId)!;
       requireRule(club.seniorPlaces > 0 && calculateOverall(s.player.position, s.player.attributes) >= club.squadOverall - 8, 'Principal sem vaga ou OVR insuficiente.');
       club.youthPlaces++; club.seniorPlaces--; s.contract = { ...s.contract, team: 'senior', role: 'prospect' }; s.stage = 'contracted'; s.offers = []; s.preparation = null;
-      s.coachTrust = Math.min(s.coachTrust, 40); joinShirt(s);
+      s.coachTrust = Math.min(s.coachTrust, 40); joinShirt(s, true);
       s.history.push('Promovido ao principal pelo desempenho.'); break;
     }
     default: throw new Error('Comando inválido.');

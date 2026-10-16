@@ -1,3 +1,4 @@
+import type { ReceptionFrame } from '../domain/gameplay/reception.js';
 import type { CrowdProfile } from '../domain/match/crowd.js';
 import { stadiumFor, type StadiumProfile } from '../data/stadiums.js';
 import { paintPixelPlayers, spriteFrame, spriteFacing, SPRITE_SIZE, playerAnimationFrame, type PlayerAnimation } from './pixel-player.js';
@@ -16,9 +17,10 @@ const GOAL_SCALE = 400 / 7.32;
 export function worldPoint(p: Point, goal = false): { x: number; y: number; z: number } {
   return { x: (p.x - 440) / GOAL_SCALE, y: goal ? (95 - p.y) / 70 * 2.44 : BALL_RADIUS, z: goal ? 0 : (p.y - 95) / 50 };
 }
+export function sprintHeading(lateralSpeed: number, forwardSpeed: number) { return Math.max(-.35, Math.min(.35, Math.atan2(-lateralSpeed, Math.max(1, forwardSpeed)))); }
 export function contactEffects(x: number, y: number) {
   const length = Math.hypot(x, y), scale = length > .95 ? .95 / length : 1;
-  return { x: x * scale, y: y * scale, curve: -x * scale, lift: Math.max(0, -y * scale) };
+  return { x: x * scale, y: y * scale, curve: x * scale, lift: Math.max(0, -y * scale) };
 }
 export interface FieldAppearance { number: number; training: boolean; kit: Kit; stadium: StadiumProfile; crowd?: CrowdProfile | undefined; homeColors?: { primary: string; secondary: string } }
 export const fieldZone = trialZone;
@@ -196,7 +198,7 @@ export class Field3D {
     let group = this.actors[index];
     if (!group) {
       group = new THREE.Group();
-      const sprite = new THREE.Mesh(new THREE.PlaneGeometry(2, 2.5), this.uniform(index, color)); sprite.position.y = .94; sprite.name = 'pixel-player'; group.add(sprite);
+      const sprite = new THREE.Mesh(new THREE.PlaneGeometry(1.55, 2.05), this.uniform(index, color)); sprite.position.y = .91; sprite.name = 'pixel-player'; group.add(sprite);
       const shadow = new THREE.Mesh(new THREE.CircleGeometry(.28, 20), new THREE.MeshBasicMaterial({ color: '#102317', transparent: true, opacity: .28, depthWrite: false }));
       shadow.rotation.x = -Math.PI / 2; shadow.scale.y = .65; shadow.position.y = .018; group.add(shadow);
       if (color === '#d9fa6b') { const ring = new THREE.Mesh(new THREE.RingGeometry(.33, .365, 32), new THREE.MeshBasicMaterial({ color: '#d9fa6b', transparent: true, opacity: .85, side: THREE.DoubleSide })); ring.rotation.x = -Math.PI / 2; ring.position.y = .025; group.add(ring); }
@@ -214,23 +216,23 @@ export class Field3D {
     });
   }
   private setLine(line: T.Line, points: T.Vector3[]) { line.geometry.dispose(); line.geometry = new THREE.BufferGeometry().setFromPoints(points); line.computeLineDistances(); }
-  render(t: Trial | null, aim: Point | null, curve: number, lift: number, phase: ShotPhase = 'preparing', animationTime = 0) {
+  render(t: Trial | null, aim: Point | null, curve: number, lift: number, phase: ShotPhase = 'preparing', animationTime = 0, charge = 1, incoming: ReceptionFrame | null = null) {
     if (!t) { this.renderer.render(this.scene, this.camera); return; }
     this.zoneOffset = fieldZone(t.kind, t.layout,t.context);
     if (this.previewStart === null) this.previewStart = animationTime;
     this.resize();
     const contactVisible = !!this.contactCanvas.getClientRects().length;
     const celebration = t.outcome === 'goal' ? Math.min(21, Math.floor((animationTime - (this.actors[0]?.userData.goalStart ?? animationTime)) * 7)) : null;
-    const key = JSON.stringify([this.size, this.contactSize, t.kind, t.attempt, t.time, this.varView?.phase, this.varView ? Math.floor(this.varView.progress * 90) : null, t.outcome, aim?.x, aim?.y, curve, lift, phase, this.overview, this.portrait, this.portraitBack, this.goalReview, contactVisible, this.animationPreview, this.animationPreview ? playerAnimationFrame(this.animationPreview, animationTime - this.previewStart!) : null, celebration]);
+    const key = JSON.stringify([this.size, this.contactSize, t.kind, t.attempt, t.time, this.varView?.phase, this.varView ? Math.floor(this.varView.progress * 90) : null, t.outcome, charge, incoming, aim?.x, aim?.y, curve, lift, phase, this.overview, this.portrait, this.portraitBack, this.goalReview, contactVisible, this.animationPreview, this.animationPreview ? playerAnimationFrame(this.animationPreview, animationTime - this.previewStart!) : null, celebration]);
     if (key === this.renderKey) return; this.renderKey = key;
     this.actors.forEach(a => { a.visible = false; }); this.cones.forEach(a => { a.visible = false; }); this.gates.forEach(a => { a.visible = false; });
     if (!this.sprintLanes.length) for (const x of [293, 587]) { const lane = new THREE.Mesh(new THREE.BoxGeometry(.045, .015, 26), this.material('#c4d3a9')); lane.userData.localX = x; this.scene.add(lane); this.sprintLanes.push(lane); }
     this.sprintLanes.forEach(lane => { lane.visible = t.kind === 'speed'; lane.position.copy(this.vector({ x: lane.userData.localX, y: 650 })); lane.position.y = .025; });
     this.line.visible = t.kind === 'vision' || t.kind === 'pass'; this.line.position.z = this.zoneOffset + (t.offsideLine - 95) / 50; let count = 0;
     let focus = t.kind === 'technique' ? t.player : t.origin;
-    if (t.kind === 'speed') focus = { x: [147, 440, 733][t.lane]!, y: 1160 };
+    if (t.kind === 'speed') focus = t.player;
     const midfield = ['pass', 'vision', 'technique', 'speed'].includes(t.kind);
-    const centre = this.vector(focus); this.reviewMonitor.group.position.z = this.zoneOffset + 13;
+    const centre = this.vector(t.kind === 'speed' ? { x: 440, y: 1160 } : focus); this.reviewMonitor.group.position.z = this.zoneOffset + 13;
     const refStart = this.vector(t.referee.position), monitor = this.reviewMonitor.group.position;
     const walk = this.varView?.phase === 'walk' ? this.varView.progress : this.varView?.phase === 'monitor' ? 1 : 0;
     const refereePosition = refStart.clone().lerp(new THREE.Vector3(monitor.x, 0, monitor.z + 1.1), walk);
@@ -274,7 +276,7 @@ export class Field3D {
       if (t.kind === 'pass' || t.kind === 'vision') { t.defenders.forEach(p => this.actor(count++, p, '#dd5860')); (t.kind === 'vision' ? t.mates : [teammateAt(t.time, t.layout)]).forEach(p => this.actor(count++, p, '#65beed')); }
       else { this.actor(count++, { x: t.shot?.keeper ?? keeperAt(t.time), y: 95 }, '#f7af65'); if (t.kind === 'freekick') [360, 410, 460, 510].forEach(x => this.actor(count++, { x, y: 720 }, '#dd5860')); }
       if (t.shot) {
-        const fraction = Math.min(1, t.shot.elapsed / t.shot.duration); const points = Array.from({ length: 41 }, (_, i) => { const p = shotBallPosition(t, t.shot!.elapsed * i / 40); return new THREE.Vector3(p.x, p.y, p.z); }); this.ball.position.copy(points[points.length - 1]!);
+        const fraction = Math.min(1, t.shot.elapsed / t.shot.duration); const points = Array.from({ length: 41 }, (_, i) => { const p = shotBallPosition(t, t.shot!.elapsed * i / 40); return new THREE.Vector3(p.x, p.y, p.z); }); const body = t.shot.ball.position; points[points.length - 1]!.set(body.x,body.y,body.z); this.ball.position.set(body.x,body.y,body.z);
         this.ball.rotation.x = fraction * 12; this.ball.rotation.z = fraction * t.shot.curve * 8;
         this.setLine(this.trail, points); this.trail.visible = true;
 
@@ -284,21 +286,23 @@ export class Field3D {
     const assistantIndex = count, lineZ = this.zoneOffset + (t.offsideLine - 95) / 50;
     for (const side of [-1, 1]) { const assistant = this.actor(count++, { x: 0, y: 0 }, 'assistant'); assistant.position.set(side * 34.7, 0, side < 0 ? lineZ : 105 - lineZ); assistant.userData.yaw = side < 0 ? -Math.PI / 2 : Math.PI / 2; }
 
+    if (incoming && phase === 'preparing') { this.ball.position.copy(this.vector(t.origin)); this.ball.position.x += incoming.x; this.ball.position.y = incoming.height; this.ball.visible = true; }
     if (t.kind === 'technique') this.ball.visible = true;
+    else if (phase !== 'aiming' && t.kind !== 'speed') this.ball.visible = true;
     else if (phase === 'aiming' && ['shoot', 'freekick', 'pass', 'vision'].includes(t.kind)) this.ball.visible = false;
     this.dribbleGuide.visible=t.kind==='technique'&&!t.resolved&&!!t.gates[t.gate];
     if(this.dribbleGuide.visible){const from=this.vector(t.player),to=this.vector(t.gates[t.gate]!);from.y=to.y=.035;this.setLine(this.dribbleGuide,[from,to]);}
     this.aimLine.visible = !!aim && !t.shot && !['speed', 'technique'].includes(t.kind);
-    if (aim && this.aimLine.visible) { this.setLine(this.aimLine, this.path(t, aim, curve, lift));  }
+    if (aim && this.aimLine.visible) { const points = this.path(t, aim, curve, lift, charge * (t.kind === 'freekick' ? .65 : t.kind === 'shoot' ? .85 : 1)); this.setLine(this.aimLine, points); this.canvas.dataset.previewLength = String(points[0]!.distanceTo(points.at(-1)!)); }
     this.actors.forEach((actor, index) => {
       if (!actor.visible) return;
       const previous = actor.userData.attempt === `${t.kind}:${t.attempt}` ? actor.userData.previous as { x: number; z: number; time: number } | undefined : undefined;
       const elapsed = previous ? animationTime - previous.time : 0;
       const dx = previous ? actor.position.x - previous.x : 0, dz = previous ? actor.position.z - previous.z : 0;
-      const moving = (index === refereeIndex && this.varView?.phase === 'walk') || !t.resolved && ((elapsed > 0 && elapsed < .15 && Math.hypot(dx, dz) / elapsed > .1) || (index === 0 && t.kind === 'speed' && t.started));
-      if (index === 0 && t.kind === 'speed' && previous && elapsed > 0) { const blend = 1 - Math.exp(-elapsed * 16); actor.position.x = previous.x + dx * blend; }
+      const moving = (index === refereeIndex && this.varView?.phase === 'walk') || !t.resolved && ((elapsed > 0 && elapsed < .15 && Math.hypot(dx, dz) / elapsed > .1) || (index === 0 && t.kind === 'speed' && t.velocity.y > .15));
       let yaw = actor.userData.yaw as number;
       if (moving && Math.hypot(dx, dz) > .001) yaw = Math.atan2(-dx, -dz);
+      if (index === 0 && t.kind === 'speed') yaw = sprintHeading(t.velocity.x / GOAL_SCALE, t.velocity.y);
       if (index === 0 && t.kind === 'technique' && Math.hypot(t.velocity.x, t.velocity.y) > 4) yaw = Math.atan2(-t.velocity.x, -t.velocity.y);
       if (index === 0 && !['speed', 'technique'].includes(t.kind) && (aim || t.shot)) {
         const target = this.vector(aim ?? t.shot!.end, !['pass', 'vision'].includes(t.kind));
@@ -309,7 +313,9 @@ export class Field3D {
       const kickTime = t.shot && (index === 0 || keeper) && !t.resolved ? t.shot.elapsed : null;
       const cameraYaw = Math.atan2(this.camera.position.x - actor.position.x, this.camera.position.z - actor.position.z);
       let direction = spriteFacing(yaw, cameraYaw);
-      let frame = spriteFrame(index===0&&t.kind==='technique'?t.travel/180:animationTime,moving,kickTime,keeper);
+      let frame = spriteFrame(index===0&&t.kind==='technique'?t.travel/450:index===0&&t.kind==='speed'?t.distance/9:animationTime,moving,kickTime,keeper);
+      if (keeper && t.shot && t.shot.elapsed > .18 && t.shot.goalkeeper.dive > .15) frame = 7;
+      if (index === 0 && incoming && t.shot && t.shot.elapsed < .65) frame = playerAnimationFrame(incoming.kind === 'bounce' ? 'volley' : incoming.kind === 'left-cross' ? 'header' : 'bicycle', t.shot.elapsed);
       if (index === 0 && t.outcome === 'goal') { actor.userData.goalStart ??= animationTime; if (animationTime - actor.userData.goalStart < 3) frame = playerAnimationFrame('celebrate', animationTime - actor.userData.goalStart); }
       else delete actor.userData.goalStart;
       if (index === refereeIndex && ['goal', 'offside'].includes(t.referee.signal)) { actor.userData.signalStart ??= animationTime; frame = playerAnimationFrame(t.referee.signal === 'goal' ? 'goal-check' : 'offside', animationTime - actor.userData.signalStart); } else delete actor.userData.signalStart;
@@ -319,7 +325,8 @@ export class Field3D {
       if (index === 0 && this.portrait && this.animationPreview) frame = playerAnimationFrame(this.animationPreview, animationTime - this.previewStart!);
       direction = spriteFacing(yaw, cameraYaw);
       const sprite = actor.children[0] as T.Mesh<T.PlaneGeometry, T.MeshBasicMaterial>;
-      sprite.rotation.y = cameraYaw;
+      sprite.rotation.y = cameraYaw; sprite.rotation.z = keeper && t.shot ? -Math.sign(t.shot.goalkeeper.target - t.shot.goalkeeper.x) * t.shot.goalkeeper.dive * .75 : index === 0 && t.kind === 'speed' ? -t.velocity.x / 700 * .09 : 0;
+      if (index === 0) this.canvas.dataset.facing = JSON.stringify({ yaw, direction, x: actor.position.x, z: actor.position.z });
       if (index === 0 && this.portrait && (this.animationPreview?.endsWith('-card') || this.animationPreview === 'offside' || this.animationPreview === 'goal-check' || this.animationPreview === 'assistant-flag')) sprite.material = this.uniform(index, 'referee');
       sprite.material.map!.offset.set(frame / SPRITE_SIZE.frames, (SPRITE_SIZE.directions - 1 - direction) / SPRITE_SIZE.directions);
       sprite.userData.frame = frame; sprite.userData.facing = direction;

@@ -14,10 +14,11 @@ test('shots score goals, keeper saves central attempts, wide shots fail and reso
   const t = kick('shoot', { x: 300, y: 60 }); const before = structuredClone(t);
   controlTrial(t, { type: 'kick', aim: { x: 440, y: 60 }, curve: 0, lift: 0 }); advance(t, 1); assert.deepEqual(t, before);
 });
-test('free kicks hit a wall unless lift or curve clears it', () => {
+test('free kicks must clear the wall and still beat a reacting goalkeeper', () => {
   assert.equal(kick('freekick', { x: 440, y: 60 }).outcome, 'wall');
-  assert.equal(kick('freekick', { x: 440, y: 60 }, 0, .8).outcome, 'goal');
-  assert.equal(kick('freekick', { x: 440, y: 60 }, -1).outcome, 'goal');
+  assert.equal(kick('freekick', { x: 440, y: 60 }, 0, .8).outcome, 'save');
+  assert.equal(kick('freekick', { x: 440, y: 60 }, -1).outcome, 'save');
+  assert.equal(kick('freekick', { x: 260, y: 60 }, 0, .8).outcome, 'goal');
 });
 test('passing anticipates teammate arrival and defenders intercept blocked paths', () => {
   const precise = kick('pass', teammateAt(.85)); assert.equal(precise.outcome, 'received'); assert.ok(precise.score > 95);
@@ -206,4 +207,20 @@ test('match carry exit is persisted for the next shot and old match sessions rem
  const carry=createTrial('technique',2,42,100,{technique:80,pace:80},'match');controlTrial(carry,{type:'sprint',active:true});for(const gate of carry.gates){controlTrial(carry,{type:'move',destination:gate});for(let i=0;i<250&&!carry.resolved&&Math.hypot(carry.player.x-gate.x,carry.player.y-gate.y)>3;i++)tickTrial(carry,.025);}assert.equal(carry.outcome,'complete');s=recordTrial(s,carry);s=restoreSession(JSON.stringify(s),createSession('match',42));assert.ok(Math.abs(fieldBody(s.results[1]!.carry!).z-fieldBody(carry.ball,trialZone('technique',carry.layout,carry.context)).z)<1e-9);
  const legacy={...createSession('match',42),sequence:['pass','shoot','technique','freekick']};assert.deepEqual(restoreSession(JSON.stringify(legacy),createSession('match',42)).sequence,legacy.sequence);
  assert.throws(()=>restoreSession(JSON.stringify({...s,results:[s.results[0],{...s.results[1],carry:{x:Infinity,y:500}}]}),createSession('match',42)));
+});
+
+test('sprint lane changes travel through the space between lanes and collision uses physical position', () => {
+  const t = createTrial('speed',1,42);controlTrial(t,{type:'lane',direction:-1});
+  assert.equal(t.player.x,440);tickTrial(t,.1);assert.ok(t.player.x<440&&t.player.x>147);
+  const midway=t.player.x;t.obstacles=[{distance:t.distance+.001,lane:1,passed:false}];tickTrial(t,.025);assert.equal(t.collisions,1);
+  tickTrial(t,1);assert.ok(t.player.x<midway);assert.ok(Math.abs(t.player.x-147)<2);
+  controlTrial(t,{type:'lane',direction:1});const before=t.player.x;tickTrial(t,.1);assert.ok(t.player.x>before&&t.player.x<440);
+});
+
+test('analog sprint drag controls pace, release brakes, and the player attribute caps maximum speed', () => {
+  const slow = createTrial('speed',1,42,100,{technique:50,pace:20}), fast = createTrial('speed',1,42,100,{technique:50,pace:90});
+  for (const t of [slow,fast]) { t.obstacles=[]; controlTrial(t,{type:'steer',direction:{x:0,y:-.25}});tickTrial(t,1); }
+  const soft=fast.velocity.y;controlTrial(fast,{type:'steer',direction:{x:0,y:-1}});tickTrial(fast,1);assert.ok(fast.velocity.y>soft*2);assert.ok(fast.velocity.y<=7+90*.045);
+  controlTrial(slow,{type:'steer',direction:{x:0,y:-1}});tickTrial(slow,1);assert.ok(fast.velocity.y>slow.velocity.y);
+  controlTrial(fast,{type:'steer',direction:null});tickTrial(fast,1);assert.ok(fast.velocity.y<.01);
 });
