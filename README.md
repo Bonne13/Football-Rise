@@ -107,3 +107,7 @@ A base não disputa automaticamente torneios adultos. Convocação para a Copa e
 O formato atual é `schemaVersion: 3`, com migração de saves v1/v2. O navegador usa IndexedDB para acomodar o calendário, preservando exportação/importação e fallback legado. O limite por save é 32 MB; pacotes de dados mantêm o limite de 10 MB. Renovação permite continuar além do primeiro contrato, nos últimos seis meses e com confiança suficiente.
 
 O menu de pausa também tem **Ver jogador** e qualidade gráfica **Automática / Alta / Leve**. O jogo permanece por oportunidades controláveis, sem afirmar uma partida completa de 90 minutos com 22 jogadores de IA.
+
+Para verificar os controles e gerar capturas de revisão dos uniformes: `npm run test:controls` (Chromium disponível no ambiente). A condução aceita arraste contínuo no campo, WASD/setas e clique em destino; solte o direcional para frear. Na inspeção do atleta, “Ver costas” mostra a numeração integrada ao tecido.
+
+Os atletas agora usam pixel art/2D no campo 3D. “Ver jogador” na pausa oferece frente/costas e uma biblioteca demonstrativa de cabeceio, bicicleta, voleio, comemoração, cartões e lesão. Comemoração e sinais do árbitro acompanham gols/impedimentos reais da oportunidade; as demais demonstrações não aplicam eventos na carreira. Gol exige a bola inteira além da linha; impedimento usa snapshot dos corpos no passe.

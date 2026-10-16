@@ -1,10 +1,11 @@
 import type { Attributes } from '../domain/player/player.js';
-import { validTarget, freePullShot, type ShotPhase } from './aim-state.js';
+import { validTarget, freePullShot, dribbleStick, type ShotPhase } from './aim-state.js';
+import { paintPixelPlayers, spriteFrame, SPRITE_SIZE, PLAYER_ANIMATIONS, type PlayerAnimation } from './pixel-player.js';
 import { Field3D, type FieldAppearance } from './field3d.js';
 import { createTrial, strikeVelocity, controlTrial, tickTrial, ballPath, keeperAt, teammateAt, type Point, type Trial } from '../domain/gameplay/trial.js';
 import { recordTrial, sessionAverage, type DrillSession } from '../application/drills.js';
 export const DRILL_NAMES = { shoot: 'Finalização', vision: 'Visão de jogo', pass: 'Passe', speed: 'Velocidade', technique: 'Condução e drible', freekick: 'Falta' };
-const hints = { shoot: 'Puxe no campo para mirar e dosar a força. Depois, toque na bola ampliada para escolher a curva e chutar.', vision: 'Passe para um companheiro livre. A linha laranja marca o impedimento. Puxe na direção oposta ao passe.', pass: 'Antecipe o companheiro azul em movimento. Puxe e solte, evitando os defensores vermelhos.', speed: 'Toque no lado esquerdo ou direito para mudar de faixa. Desvie dos obstáculos até os 100 metros.', technique: 'Toque no gramado para conduzir a bola. Passe pelos portões numerados em ordem, sem tocar nos cones.', freekick: 'Puxe no campo para definir mira e força. Depois toque na bola para escolher a curva e chutar.' };
+const hints = { shoot: 'Puxe no campo para mirar e dosar a força. Depois, toque na bola ampliada para escolher a curva e chutar.', vision: 'Passe para um companheiro livre. A linha laranja marca o impedimento. Puxe na direção oposta ao passe.', pass: 'Antecipe o companheiro azul em movimento. Puxe e solte, evitando os defensores vermelhos.', speed: 'Toque no lado esquerdo ou direito para mudar de faixa. Desvie dos obstáculos até os 100 metros.', technique: 'Arraste no gramado como um direcional para conduzir; solte para frear. Um toque manda correr até o ponto. Atravesse os portões em ordem com a bola.', freekick: 'Puxe no campo para definir mira e força. Depois toque na bola para escolher a curva e chutar.' };
 interface Options { fixtureLabel: string; appearance: FieldAppearance; attributes: Attributes; session: DrillSession; onProgress: (session: DrillSession) => void; onComplete: (session: DrillSession) => void | Promise<void>; onExit: () => void }
 const W = 880, H = 1320;
 function project(p: Point): Point { const scale = .5 + p.y / 1320 * .5; return { x: 440 + (p.x - 440) * scale, y: 120 + p.y * .85 }; }
@@ -16,10 +17,12 @@ export function mountField(host: HTMLElement, options: Options): () => void {
   let drag: { id: number; x: number; y: number } | null = null;
   let aim: Point | null = null, pullTip: Point | null = null;
   let selectedAim: Point = { x: 440, y: 65 };
+  let dribbleDrag: { id: number; x: number; y: number; active: boolean } | null = null;
   let contactDrag: { id: number; x: number; y: number } | null = null;
   let power = 0, confirmed = false;
   let phase: ShotPhase = 'aiming';
-  let overview = false;
+  let overview = false, portraitBack = false;
+  const movementKeys = new Set<string>();
   let paused = false, presentationTime = 0, recorded = false;
   let muted = false;
   try { muted = localStorage.getItem('football-rise.sound-muted') === 'true'; } catch {}
@@ -29,7 +32,7 @@ export function mountField(host: HTMLElement, options: Options): () => void {
     try { audio ??= new AudioContext(); void audio.resume(); const oscillator = audio.createOscillator(), gain = audio.createGain(); oscillator.connect(gain); gain.connect(audio.destination); oscillator.frequency.setValueAtTime(frequency, audio.currentTime); oscillator.frequency.exponentialRampToValueAtTime(frequency / 2, audio.currentTime + .16); gain.gain.setValueAtTime(.08, audio.currentTime); gain.gain.exponentialRampToValueAtTime(.001, audio.currentTime + .2); oscillator.start(); oscillator.stop(audio.currentTime + .21); } catch {}
   }
   document.body.classList.add('field-screen');
-  host.innerHTML = `<section class="field-stage"><div class="field-heading"><div><small class="stadium-caption" id="stadium-caption"></small><span class="eyebrow">${session.mode === 'assessment' ? 'ACADEMIA / AVALIAÇÃO' : session.mode === 'match' ? 'DIA DE JOGO' : 'CENTRO DE TREINAMENTO'}</span><h2 id="drill-name"></h2><small class="fixture-caption" id="fixture-caption"></small></div><strong id="drill-counter"></strong></div><nav class="shot-steps" aria-label="Etapas do chute"><span data-step="aiming"><b>01</b> Mire</span><span data-step="preparing"><b>02</b> Prepare</span><span data-step="flight"><b>03</b> Finalize</span></nav><button type="button" id="field-return" hidden>Voltar ao exercício</button><p id="stadium-mode-note" hidden>Visão panorâmica · exercício pausado</p><div class="field-wrap"><canvas id="football-field" width="880" height="1320" tabindex="0" aria-label="Campo de futebol interativo"></canvas><div class="field-coach"><span class="live-dot"></span><div><strong id="coach-title">Escolha seu canto.</strong><span id="drill-hint"></span></div></div><div id="pull-origin" hidden aria-hidden="true"></div><div id="pull-vector" hidden aria-hidden="true"></div><div id="aim-reticle" hidden aria-hidden="true"><i></i></div><div id="contact-dock" hidden><small>ESCOLHA A CURVA</small><canvas id="contact-ball" width="200" height="200" aria-label="Bola: toque para escolher a curva e chutar"></canvas></div><div class="field-live"><span id="field-zone"></span><span id="field-clock"></span><span id="field-score"></span></div><button type="button" id="aim-reset" hidden>Refazer mira</button></div><section id="ball-control" class="ball-control" hidden><div><span>PUXE A MIRA PARA DOSAR A FORÇA</span><div class="power-track"><progress id="shot-power" value="0" max="100"></progress><output id="shot-power-value">0%</output></div></div></section><p id="field-feedback" role="status" aria-live="polite"></p><details id="shot-effects" hidden><summary>Ajuste fino de efeito e elevação</summary><div class="fields"><label>Efeito lateral<input id="field-curve" type="range" min="-1" max="1" step="0.05" value="0"></label><label>Elevação<input id="field-lift" type="range" min="0" max="1" step="0.05" value="0"></label></div></details><div class="actions" id="lane-buttons" hidden><button type="button" id="lane-left">← Esquerda</button><button type="button" id="lane-right">Direita →</button></div><div class="field-actions"><button type="button" id="field-pause" aria-label="Pausar">Pausar</button><button type="button" id="field-next" class="primary" hidden>Próxima tentativa →</button></div><dialog id="pause-menu" aria-labelledby="pause-title"><span class="eyebrow">FOOTBALL RISE</span><h2 id="pause-title">Jogo pausado</h2><p>A ação fica parada enquanto você estiver aqui.</p><button id="field-resume" class="primary">Continuar jogando</button><button id="field-player" type="button">Ver jogador</button><button id="field-stadium" type="button">Conhecer o estádio</button><button id="field-sound" type="button"></button><label class="graphics-setting">Qualidade gráfica<select id="field-quality"><option value="auto">Automática</option><option value="high">Alta · computador</option><option value="low">Leve · mais desempenho</option></select></label><button id="field-exit" type="button">Salvar e voltar à carreira</button><p class="hint" id="pause-status">As tentativas concluídas são guardadas. Uma ação em andamento recomeça ao voltar.</p></dialog><p id="renderer-status" class="hint"></p></section>`;
+  host.innerHTML = `<section class="field-stage"><div class="field-heading"><div><small class="stadium-caption" id="stadium-caption"></small><span class="eyebrow">${session.mode === 'assessment' ? 'ACADEMIA / AVALIAÇÃO' : session.mode === 'match' ? 'DIA DE JOGO' : 'CENTRO DE TREINAMENTO'}</span><h2 id="drill-name"></h2><small class="fixture-caption" id="fixture-caption"></small></div><strong id="drill-counter"></strong></div><nav class="shot-steps" aria-label="Etapas do chute"><span data-step="aiming"><b>01</b> Mire</span><span data-step="preparing"><b>02</b> Prepare</span><span data-step="flight"><b>03</b> Finalize</span></nav><button type="button" id="field-return" hidden>Voltar ao exercício</button><p id="stadium-mode-note" hidden>Visão panorâmica · exercício pausado</p><button type="button" id="player-turn" hidden>Ver costas</button><label id="player-animation-control" hidden>Animações · demonstração<select id="player-animation"><option value="">Postura atual</option>${Object.entries(PLAYER_ANIMATIONS).map(([id, a]) => `<option value="${id}">${a.label}</option>`).join('')}</select></label><div class="field-wrap"><canvas id="football-field" width="880" height="1320" tabindex="0" aria-label="Campo de futebol interativo"></canvas><div class="field-coach"><span class="live-dot"></span><div><strong id="coach-title">Escolha seu canto.</strong><span id="drill-hint"></span></div></div><div id="pull-origin" hidden aria-hidden="true"></div><div id="pull-vector" hidden aria-hidden="true"></div><div id="aim-reticle" hidden aria-hidden="true"><i></i></div><div id="contact-dock" hidden><small>ESCOLHA A CURVA</small><canvas id="contact-ball" width="200" height="200" aria-label="Bola: toque para escolher a curva e chutar"></canvas></div><div class="field-live"><span id="field-zone"></span><span id="field-clock"></span><span id="field-score"></span><span id="referee-decision"></span></div><button type="button" id="aim-reset" hidden>Refazer mira</button></div><section id="ball-control" class="ball-control" hidden><div><span>PUXE A MIRA PARA DOSAR A FORÇA</span><div class="power-track"><progress id="shot-power" value="0" max="100"></progress><output id="shot-power-value">0%</output></div></div></section><p id="field-feedback" role="status" aria-live="polite"></p><details id="shot-effects" hidden><summary>Ajuste fino de efeito e elevação</summary><div class="fields"><label>Efeito lateral<input id="field-curve" type="range" min="-1" max="1" step="0.05" value="0"></label><label>Elevação<input id="field-lift" type="range" min="0" max="1" step="0.05" value="0"></label></div></details><div class="actions" id="lane-buttons" hidden><button type="button" id="lane-left">← Esquerda</button><button type="button" id="lane-right">Direita →</button></div><div class="field-actions"><button type="button" id="field-pause" aria-label="Pausar">Pausar</button><button type="button" id="field-next" class="primary" hidden>Próxima tentativa →</button></div><dialog id="pause-menu" aria-labelledby="pause-title"><span class="eyebrow">FOOTBALL RISE</span><h2 id="pause-title">Jogo pausado</h2><p>A ação fica parada enquanto você estiver aqui.</p><button id="field-resume" class="primary">Continuar jogando</button><button id="field-goal-review" type="button" hidden>Rever bola e linha do gol</button><button id="field-player" type="button">Ver jogador</button><button id="field-stadium" type="button">Conhecer o estádio</button><button id="field-sound" type="button"></button><label class="graphics-setting">Qualidade gráfica<select id="field-quality"><option value="auto">Automática</option><option value="high">Alta · computador</option><option value="low">Leve · mais desempenho</option></select></label><button id="field-exit" type="button">Salvar e voltar à carreira</button><p class="hint" id="pause-status">As tentativas concluídas são guardadas. Uma ação em andamento recomeça ao voltar.</p></dialog><p id="renderer-status" class="hint"></p></section>`;
   const $ = <T extends HTMLElement>(id: string) => host.querySelector<T>('#' + id)!;
   $('fixture-caption').textContent = options.fixtureLabel;
   $('stadium-caption').textContent = `${options.appearance.stadium.name} · ${options.appearance.stadium.city} · ${options.appearance.stadium.country} (cenário simulado)`;
@@ -64,14 +67,14 @@ export function mountField(host: HTMLElement, options: Options): () => void {
       $('shot-effects').hidden = true; $('ball-control').hidden = true; $('contact-dock').hidden = true; $('lane-buttons').hidden = true; draw(); return;
     }
     const kind = session.sequence[session.results.length]!;
-    trial = createTrial(kind, session.results.length + 1, session.seed);
+    trial = createTrial(kind, session.results.length + 1, session.seed, 100, options.attributes);
     selectedAim = kind === 'pass' ? teammateAt(.85, trial.layout) : kind === 'vision' ? { ...trial.mates[0]! } : { ...trial.target };
     $('drill-name').textContent = DRILL_NAMES[kind];
     $('drill-counter').textContent = `${session.results.length + 1} / ${session.sequence.length}`;
     $('field-zone').textContent = `${['shoot', 'freekick'].includes(kind) ? (trial.layout === 0 ? 'Frente do gol' : trial.layout === 1 ? 'Lado esquerdo' : 'Lado direito · longa distância') : trial.layout === 0 ? 'Meio-campo' : trial.layout === 1 ? 'Meio-campo · lado esquerdo' : 'Meio-campo · lado direito'} · cenário ${trial.layout + 1}/3`;
     $('drill-hint').textContent = hints[kind];
     $('shot-effects').hidden = true; $('shot-effects').removeAttribute('open'); $('ball-control').hidden = true; $('contact-dock').hidden = true; $('lane-buttons').hidden = kind !== 'speed'; next.hidden = true;
-    feedback.textContent = kind === 'technique' ? 'Toque nos portões em ordem para conduzir a bola.' : kind === 'speed' ? 'Escolha uma faixa e desvie dos obstáculos.' : 'Puxe para trás, ajuste para os lados e solte para jogar.';
+    feedback.textContent = kind === 'technique' ? 'Arraste para conduzir, solte para frear. No computador, use WASD ou as setas.' : kind === 'speed' ? 'Escolha uma faixa e desvie dos obstáculos.' : 'Puxe para trás, ajuste para os lados e solte para jogar.';
     updatePhase();
     canvas.setAttribute('aria-label', `Campo de futebol: ${DRILL_NAMES[kind]}`); draw();
   }
@@ -94,10 +97,10 @@ export function mountField(host: HTMLElement, options: Options): () => void {
   }
   function lane(direction: -1 | 1) { if (trial) controlTrial(trial, { type: 'lane', direction }); }
   canvas.onpointerdown = event => {
-    if (overview || paused || !trial || trial.resolved || trial.shot || drag || contactDrag || event.isPrimary === false || event.button !== 0) return;
+    if (overview || paused || !trial || trial.resolved || trial.shot || drag || dribbleDrag || contactDrag || event.isPrimary === false || event.button !== 0) return;
     event.preventDefault(); canvas.focus({ preventScroll: true });
     if (trial.kind === 'speed') { lane(event.clientX < canvas.getBoundingClientRect().left + canvas.clientWidth / 2 ? -1 : 1); return; }
-    if (trial.kind === 'technique') { const p = view3d?.pick(event.clientX, event.clientY, true) ?? unproject(point(event)); controlTrial(trial, { type: 'move', destination: { x: clamp(p.x, 20, 860), y: clamp(p.y, 100, 1290) } }); return; }
+    if (trial.kind === 'technique') { dribbleDrag = { id: event.pointerId, x: event.clientX, y: event.clientY, active: false }; pullTip = { x: event.clientX, y: event.clientY }; canvas.setPointerCapture(event.pointerId); return; }
     if (confirmed) return;
     drag = { id: event.pointerId, x: event.clientX, y: event.clientY }; pullTip = { x: event.clientX, y: event.clientY };
     canvas.setPointerCapture(event.pointerId);
@@ -111,8 +114,21 @@ export function mountField(host: HTMLElement, options: Options): () => void {
     else { phase = 'aiming'; aim = null; updatePhase(); }
     return sample.active;
   }
-  canvas.onpointermove = event => { if (drag?.id !== event.pointerId || paused) return; event.preventDefault(); samplePull(event); };
+  canvas.onpointermove = event => {
+    if (dribbleDrag?.id === event.pointerId && trial && !paused) {
+      pullTip = { x: event.clientX, y: event.clientY }; event.preventDefault(); const direction = dribbleStick(event.clientX - dribbleDrag.x, event.clientY - dribbleDrag.y);
+      if (direction) dribbleDrag.active = true;
+      if (dribbleDrag.active) controlTrial(trial, { type: 'steer', direction });
+      return;
+    }
+    if (drag?.id !== event.pointerId || paused) return; event.preventDefault(); samplePull(event); };
   canvas.onpointerup = event => {
+    if (dribbleDrag?.id === event.pointerId && trial) {
+      event.preventDefault();
+      if (dribbleDrag.active) controlTrial(trial, { type: 'steer', direction: null });
+      else { const p = view3d ? view3d.pick(event.clientX, event.clientY, true) : unproject(point(event)); if (p) controlTrial(trial, { type: 'move', destination: { x: clamp(p.x, 20, 860), y: clamp(p.y, 100, 1290) } }); }
+      dribbleDrag = null; return;
+    }
     if (drag?.id !== event.pointerId || !trial) return;
     event.preventDefault();
     const active = samplePull(event);
@@ -123,11 +139,12 @@ export function mountField(host: HTMLElement, options: Options): () => void {
   };
   const cancel = () => {
     drag = null; contactDrag = null;
+    if ((dribbleDrag || movementKeys.size) && trial) controlTrial(trial, { type: 'steer', direction: null }); dribbleDrag = null; movementKeys.clear();
     if (confirmed) aim = { ...selectedAim };
     else if (phase !== 'flight' && phase !== 'resolved') { power = 0; aim = null; phase = 'aiming'; }
     last = 0; if (trial) updatePhase();
   };
-  canvas.onpointercancel = cancel; canvas.onlostpointercapture = () => { if (drag) cancel(); };
+  canvas.onpointercancel = cancel; canvas.onlostpointercapture = () => { if (drag || dribbleDrag) cancel(); };
   $('aim-reset').onclick = () => { cancel(); confirmed = false; power = 0; phase = 'aiming'; aim = null; curve.value = lift.value = '0'; view3d?.setContact(0, 0); updatePhase(); feedback.textContent = 'Escolha um novo destino. A bola aparece depois da mira.'; };
   canvas.onkeydown = event => {
     if (event.key === 'Escape') { event.preventDefault(); setPaused(!paused); return; }
@@ -135,10 +152,21 @@ export function mountField(host: HTMLElement, options: Options): () => void {
 
     const direction: Record<string, Point> = { ArrowLeft: { x: -35, y: 0 }, ArrowRight: { x: 35, y: 0 }, ArrowUp: { x: 0, y: -35 }, ArrowDown: { x: 0, y: 35 } };
     if (event.key === ' ') { event.preventDefault(); if (shotMode()) { if (!confirmed) { if (!power) power = 1; chooseTarget(aim ?? selectedAim); } else if (phase === 'preparing') { controlTrial(trial, { type: 'kick', aim: selectedAim, curve: Number(curve.value), lift: Number(lift.value), velocity: strikeVelocity(options.attributes, trial.kind, power) }); phase = 'flight'; confirmed = false; sound(160); aim = null; updatePhase(); } } return; }
+    const key = ({ w: 'ArrowUp', a: 'ArrowLeft', s: 'ArrowDown', d: 'ArrowRight' } as Record<string, string>)[event.key.toLowerCase()] ?? event.key;
+    if (trial.kind === 'technique' && direction[key]) { event.preventDefault(); movementKeys.add(key); steerKeyboard(); return; }
     const d = direction[event.key]; if (!d) return; event.preventDefault();
     if (trial.kind === 'speed') { if (d.x) lane(d.x < 0 ? -1 : 1); }
-    else if (trial.kind === 'technique') controlTrial(trial, { type: 'move', destination: { x: clamp(trial.player.x + d.x * 3, 20, 860), y: clamp(trial.player.y + d.y * 3, 100, 1290) } });
     else if (!confirmed) { const nextAim = validTarget({ x: (aim ?? selectedAim).x + d.x, y: (aim ?? selectedAim).y + d.y / 3 }, groundMode()); if (nextAim) { aim = nextAim; if (phase === 'preparing') selectedAim = { ...nextAim }; } }
+  };
+  function steerKeyboard() {
+    if (!trial) return;
+    const x = Number(movementKeys.has('ArrowRight')) - Number(movementKeys.has('ArrowLeft'));
+    const y = Number(movementKeys.has('ArrowDown')) - Number(movementKeys.has('ArrowUp'));
+    controlTrial(trial, { type: 'steer', direction: x || y ? { x, y } : null });
+  }
+  canvas.onkeyup = event => {
+    const key = ({ w: 'ArrowUp', a: 'ArrowLeft', s: 'ArrowDown', d: 'ArrowRight' } as Record<string, string>)[event.key.toLowerCase()] ?? event.key;
+    if (movementKeys.delete(key)) { event.preventDefault(); steerKeyboard(); }
   };
   const ready = () => !overview && !paused && trial && confirmed && phase === 'preparing' && !trial.resolved && !trial.shot && !!shotMode();
   function sampleContact(event: PointerEvent) {
@@ -173,19 +201,23 @@ export function mountField(host: HTMLElement, options: Options): () => void {
     if (disposed || paused === value) return;
     paused = value; cancel(); last = 0;
     host.querySelector('.field-stage')!.setAttribute('data-paused', String(paused));
+    $('field-goal-review').hidden = !view3d || !trial?.resolved || !trial.shot || !['shoot', 'freekick'].includes(trial.kind);
     if (paused) { void audio?.suspend(); pauseMenu.showModal(); $('field-sound').textContent = muted ? 'Som: desligado' : 'Som: ligado'; }
     else { pauseMenu.close(); if (!muted) void audio?.resume(); canvas.focus({ preventScroll: true }); }
   }
   $('field-pause').onclick = () => setPaused(true);
   $('field-stadium').hidden = $('field-player').hidden = !view3d;
   function setOverview(value: boolean, portrait = false) {
-    cancel(); overview = value; view3d?.setOverview(value && !portrait); view3d?.setPortrait(value && portrait);
+    cancel(); overview = value; view3d?.setOverview(value && !portrait); view3d?.setPortrait(value && portrait); view3d?.setGoalReview(false); portraitBack = false; view3d?.setPortraitBack(false); $('player-turn').hidden = !value || !portrait; $('player-turn').textContent = 'Ver costas'; $('player-animation-control').hidden = !value || !portrait; $<HTMLSelectElement>('player-animation').value = ''; view3d?.setAnimationPreview(null);
     $('stadium-mode-note').textContent = portrait ? 'Inspeção do atleta · exercício pausado' : 'Visão panorâmica · exercício pausado';
     host.querySelector('.field-stage')!.setAttribute('data-view', value ? 'stadium' : 'player');
     $('field-return').hidden = $('stadium-mode-note').hidden = !value;
     if (value) void audio?.suspend(); else if (!muted) void audio?.resume();
     last = 0; draw();
   }
+  $('player-animation').onchange = () => { const action = $<HTMLSelectElement>('player-animation').value; view3d?.setAnimationPreview(action in PLAYER_ANIMATIONS ? action as PlayerAnimation : null); $('stadium-mode-note').textContent = action ? 'Demonstração de animação · não é um evento da carreira' : 'Inspeção do atleta · exercício pausado'; draw(); };
+  $('player-turn').onclick = () => { portraitBack = !portraitBack; view3d?.setPortraitBack(portraitBack); $('player-turn').textContent = portraitBack ? 'Ver frente' : 'Ver costas'; draw(); };
+  $('field-goal-review').onclick = () => { if (!trial?.shot) return; setPaused(false); setOverview(true); view3d?.setGoalReview(true); $('stadium-mode-note').textContent = trial.shot.decision === 'goal' ? 'Gol confirmado · bola inteira além da linha' : 'Sem gol · confira a posição da bola e da linha'; draw(); };
   $('field-player').onclick = () => { setPaused(false); setOverview(true, true); };
   $('field-stadium').onclick = () => { setPaused(false); setOverview(true); };
   $('field-return').onclick = () => setOverview(false);
@@ -203,23 +235,35 @@ export function mountField(host: HTMLElement, options: Options): () => void {
     ctx!.strokeStyle = color; ctx!.lineWidth = width; ctx!.beginPath(); points.forEach((p, i) => { const v = project(p); if (i) ctx!.lineTo(v.x, v.y); else ctx!.moveTo(v.x, v.y); }); ctx!.stroke();
   }
   function disc(p: Point, radius: number, color: string) { const v = project(p), scale = .5 + p.y / 1320 * .5; ctx!.fillStyle = color; ctx!.beginPath(); ctx!.ellipse(v.x, v.y, radius * scale, radius * scale * .7, 0, 0, Math.PI * 2); ctx!.fill(); }
+  const pixelSheets = new Map<string, HTMLCanvasElement>();
   function actor(p: Point, color: string, label = '') {
-    const v = project(p), s = .6 + p.y / 1320 * .4; disc(p, 21, '#0005'); ctx!.fillStyle = color; ctx!.fillRect(v.x - 14 * s, v.y - 46 * s, 28 * s, 32 * s);
-    ctx!.fillStyle = '#f1bc8e'; ctx!.beginPath(); ctx!.arc(v.x, v.y - 59 * s, 10 * s, 0, Math.PI * 2); ctx!.fill();
-    ctx!.strokeStyle = '#edf5f0'; ctx!.lineWidth = 7 * s; ctx!.beginPath(); ctx!.moveTo(v.x - 7 * s, v.y - 14 * s); ctx!.lineTo(v.x - 10 * s, v.y); ctx!.moveTo(v.x + 7 * s, v.y - 14 * s); ctx!.lineTo(v.x + 12 * s, v.y); ctx!.stroke();
-    if (label) { ctx!.font = 'bold 27px system-ui'; ctx!.fillStyle = '#fff'; ctx!.textAlign = 'center'; ctx!.fillText(label, v.x, v.y - 83 * s); }
+    const user = color === options.appearance.kit.shirt;
+    const key = `${color}:${label}`; let sheet = pixelSheets.get(key);
+    if (!sheet) {
+      sheet = document.createElement('canvas');
+      paintPixelPlayers(sheet, user ? options.appearance.kit : { ...options.appearance.kit, shirt: color, pattern: 'plain' }, user ? options.appearance.number : Number(label) || 1, options.appearance.training);
+      pixelSheets.set(key, sheet);
+    }
+    const v = project(p), scale = .6 + p.y / 1320 * .4;
+    const moving = user && !!trial?.started && !trial.resolved && (trial.kind === 'speed' || trial.kind === 'technique' && Math.hypot(trial.velocity.x, trial.velocity.y) > 4);
+    const frame = spriteFrame(presentationTime, moving, user && trial?.shot ? trial.shot.elapsed : null);
+    disc(p, 16, '#0005'); ctx!.imageSmoothingEnabled = false;
+    ctx!.drawImage(sheet, frame * SPRITE_SIZE.width, (user ? 1 : 0) * SPRITE_SIZE.height, SPRITE_SIZE.width, SPRITE_SIZE.height, Math.round(v.x - 48 * scale), Math.round(v.y - 104 * scale), Math.round(96 * scale), Math.round(120 * scale));
   }
   function draw() {
     canvas.style.cursor = confirmed ? 'default' : drag ? 'grabbing' : 'grab';
-    $('pull-origin').hidden = $('pull-vector').hidden = !drag || !pullTip;
-    if (drag && pullTip) {
-      const rect = canvas.getBoundingClientRect(), dx = pullTip.x - drag.x, dy = pullTip.y - drag.y;
-      for (const id of ['pull-origin', 'pull-vector']) { $(id).style.left = `${drag.x - rect.left}px`; $(id).style.top = `${drag.y - rect.top}px`; }
+    const gesture = drag ?? dribbleDrag;
+    $('pull-origin').hidden = $('pull-vector').hidden = !gesture || !pullTip;
+    $('pull-origin').classList.toggle('dribble-stick', !!dribbleDrag);
+    if (gesture && pullTip) {
+      const rect = canvas.getBoundingClientRect(), dx = pullTip.x - gesture.x, dy = pullTip.y - gesture.y;
+      for (const id of ['pull-origin', 'pull-vector']) { $(id).style.left = `${gesture.x - rect.left}px`; $(id).style.top = `${gesture.y - rect.top}px`; }
       $('pull-vector').style.width = `${Math.hypot(dx, dy)}px`; $('pull-vector').style.transform = `rotate(${Math.atan2(dy, dx)}rad)`;
     }
     $<HTMLProgressElement>('shot-power').value = power * 100; $('shot-power-value').textContent = `${Math.round(power * 100)}% · ${Math.round(strikeVelocity(options.attributes, trial?.kind ?? 'shoot', power))} km/h`;
+    $('referee-decision').textContent = trial?.referee.signal === 'goal' ? 'Árbitro: gol confirmado' : trial?.referee.signal === 'offside' ? 'Árbitro: impedimento' : trial?.referee.signal === 'no-goal' ? 'Árbitro: sem gol' : '';
     if (view3d) { view3d.render(trial, aim, Number(curve.value), Number(lift.value), phase, presentationTime);
-      const reticle = $('aim-reticle'); reticle.hidden = !aim || !trial || !!trial.shot; if (aim && trial && !trial.shot) { const p = view3d.screenPoint(aim, !groundMode()); reticle.style.left = `${p.x}px`; reticle.style.top = `${p.y}px`; } if (trial) { $('field-clock').textContent = !trial.started ? 'PREPARE SUA JOGADA' : `${trial.time.toFixed(1)} s`; $('field-score').textContent = trial.kind === 'speed' ? `${Math.min(100, Math.floor(trial.distance))} m` : trial.kind === 'technique' ? `${trial.gate}/5 portões` : power > 0 ? `POTÊNCIA ${Math.round(power * 100)}%` : 'MIRA · CONTATO · POTÊNCIA'; } return; }
+      const reticle = $('aim-reticle'); reticle.hidden = !aim || !trial || !!trial.shot; if (aim && trial && !trial.shot) { const p = view3d.screenPoint(aim, !groundMode()); reticle.style.left = `${p.x}px`; reticle.style.top = `${p.y}px`; } if (trial) { $('field-clock').textContent = !trial.started ? 'PREPARE SUA JOGADA' : `${trial.time.toFixed(1)} s`; $('field-score').textContent = trial.kind === 'speed' ? `${Math.min(100, Math.floor(trial.distance))} m` : trial.kind === 'technique' ? `${trial.gate}/5 portões` : power > 0 ? `POTÊNCIA ${Math.round(power * 100)}%` : 'MIRA + FORÇA → CURVA'; } return; }
     if (contact2d) { contact2d.clearRect(0, 0, 200, 200); const gradient = contact2d.createRadialGradient(75, 60, 5, 100, 100, 80); gradient.addColorStop(0, '#fff'); gradient.addColorStop(1, '#8193a4'); contact2d.fillStyle = gradient; contact2d.beginPath(); contact2d.arc(100, 100, 80, 0, Math.PI * 2); contact2d.fill(); contact2d.fillStyle = '#102338'; for (const [x,y] of [[90,65],[50,120],[140,130]]) { contact2d.beginPath(); for (let k=0;k<5;k++) {const a=k*Math.PI*2/5;const px=x!+Math.cos(a)*19,py=y!+Math.sin(a)*19;if(k)contact2d.lineTo(px,py);else contact2d.moveTo(px,py);}contact2d.fill();} }
     ctx!.clearRect(0, 0, W, H); ctx!.fillStyle = '#102f25'; ctx!.fillRect(0, 0, W, H);
     for (let i = 0; i < 12; i++) {
@@ -243,7 +287,7 @@ export function mountField(host: HTMLElement, options: Options): () => void {
       actor({ x: [147, 440, 733][t.lane]!, y: 1160 }, options.appearance.kit.shirt, String(options.appearance.number));
     } else if (t.kind === 'technique') {
       t.gates.forEach((p, i) => { if (i >= t.gate) { line([{ x: p.x - 50, y: p.y }, { x: p.x + 50, y: p.y }], i === t.gate ? '#e0ff67' : '#b8e8cc77', 12); const v = project(p); ctx!.font = 'bold 28px system-ui'; ctx!.fillStyle = '#fff'; ctx!.fillText(String(i + 1), v.x, v.y - 20); } });
-      t.cones.forEach(p => disc(p, 30, '#ff873c')); actor(t.player, options.appearance.kit.shirt); disc({ x: t.player.x, y: t.player.y - 22 }, 13, '#fff');
+      t.cones.forEach(p => disc(p, 30, '#ff873c')); actor(t.player, options.appearance.kit.shirt); disc(t.ball, 13, '#fff');
     } else {
       actor({ x: t.origin.x - 38, y: t.origin.y + 38 }, options.appearance.kit.shirt, String(options.appearance.number));
       if (t.kind === 'pass' || t.kind === 'vision') {

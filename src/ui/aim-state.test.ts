@@ -23,8 +23,21 @@ test('free pull needs a backward gesture and permits steering beyond the posts',
   for (const dy of [-100, 0, 11]) assert.equal(freePullShot(origin, 30, dy, 120, false).active, false);
   const left = freePullShot(origin, 50, 90, 120, false);
   assert.equal(left.active, true); assert.equal(left.power, .75); assert.ok(left.aim.x < 240);
-  assert.equal(freePullShot(origin, -50, 90, 120, false).aim.x, 815);
+  assert.ok(freePullShot(origin, -50, 90, 120, false).aim.x > 640);
   assert.equal(freePullShot(origin, 0, 240, 120, false).power, 1);
   assert.equal(freePullShot(origin, NaN, 90, 120, false).active, false);
-  assert.equal(freePullShot(origin, 0, 120, 120, true).aim.y, -150);
+  assert.equal(freePullShot(origin, 0, 120, 120, true).aim.y, 95);
+});
+
+test('aim direction stays fixed when pulling farther along the same angle; charge changes independently', async () => {
+  const { freePullShot, dribbleStick } = await import('./aim-state.js');
+  const origin = { x: 640, y: 1200 };
+  const soft = freePullShot(origin, 10, 50, 120, false), hard = freePullShot(origin, 20, 100, 120, false);
+  assert.deepEqual(soft.aim, hard.aim); assert.ok(hard.power > soft.power);
+  assert.equal(freePullShot(origin, 0, 200, 120, false).aim.y, 60);
+  assert.ok(Math.abs(freePullShot(origin, 1, 100, 120, false).aim.x - origin.x) < 8);
+  assert.equal(dribbleStick(4, 4), null); assert.equal(dribbleStick(NaN, 5), null);
+  assert.deepEqual(dribbleStick(0, -100), { x: 0, y: -1 });
+  const diagonal = dribbleStick(100, 100)!; assert.ok(Math.abs(Math.hypot(diagonal.x, diagonal.y) - 1) < 1e-10);
+  assert.ok(Math.hypot(dribbleStick(0, 30)!.x, dribbleStick(0, 30)!.y) < 1);
 });

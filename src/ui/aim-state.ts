@@ -12,10 +12,21 @@ export function pulledShot(origin: Point, target: Point, dx: number, dy: number,
   return { power, aim: { x: Math.max(-1500, Math.min(2500, origin.x + (target.x - origin.x) * power - dx / Math.max(1, maxPull) * 180)), y: Math.max(-1500, Math.min(2500, origin.y + (target.y - origin.y) * power)) } };
 }
 
-/** Reverse drag: a small dead zone prevents taps from firing; sideways pull stays independent of power. */
+/** Pull length controls charge; its angle controls direction independently of charge. */
 export function freePullShot(origin: Point, dx: number, dy: number, maxPull: number, ground: boolean) {
   const limit = Math.max(40, maxPull);
   const active = Number.isFinite(dx) && Number.isFinite(dy) && dy >= 12;
   const power = active ? Math.min(1, dy / limit) : 0;
-  return { active, power, aim: { x: origin.x - (active ? dx / limit * 900 : 0), y: ground ? origin.y - power * 1100 : 95 - power * 70 } };
+  const forward = ground ? Math.min(origin.y - 95, power * 1100) : origin.y - 60;
+  const lateral = active ? dx / Math.max(24, dy) * forward * .65 : 0;
+  return { active, power, aim: { x: Math.max(-1500, Math.min(2500, origin.x - lateral)), y: ground ? origin.y - forward : 60 } };
+}
+
+/** Floating thumbstick, expressed in screen space; dead zone keeps taps as destination clicks. */
+export function dribbleStick(dx: number, dy: number, radius = 64): Point | null {
+  if (!Number.isFinite(dx) || !Number.isFinite(dy)) return null;
+  const length = Math.hypot(dx, dy);
+  if (length < 9) return null;
+  const strength = Math.min(1, (length - 9) / Math.max(1, radius - 9));
+  return { x: dx / length * strength, y: dy / length * strength };
 }

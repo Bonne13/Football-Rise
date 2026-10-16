@@ -136,3 +136,39 @@ test('all dribbling layouts can be completed through the ordered gates', () => {
     assert.equal(t.outcome, 'complete'); assert.equal(t.gate, 5); assert.ok(t.score > 0);
   }
 });
+
+test('continuous dribbling accelerates, turns and brakes while the ball stays within reach', () => {
+  const t = createTrial('technique', 1, 42);
+  controlTrial(t, { type: 'steer', direction: { x: 1, y: 0 } });
+  tickTrial(t, .05); const startSpeed = t.velocity.x;
+  tickTrial(t, .25); assert.ok(t.velocity.x > startSpeed); assert.ok(t.player.x > 440);
+  assert.ok(Math.hypot(t.ball.x - t.player.x, t.ball.y - t.player.y) < 40);
+  controlTrial(t, { type: 'steer', direction: { x: 0, y: -1 } }); tickTrial(t, .4);
+  assert.ok(t.velocity.y < -150); assert.ok(Math.abs(t.velocity.x) < 10);
+  controlTrial(t, { type: 'steer', direction: null }); tickTrial(t, .7);
+  assert.ok(Math.hypot(t.velocity.x, t.velocity.y) < 1);
+  assert.ok(Math.hypot(t.ball.x - t.player.x, t.ball.y - t.player.y) < 3);
+  assert.throws(() => controlTrial(t, { type: 'steer', direction: { x: NaN, y: 0 } }));
+});
+test('dribbling uses attributes, ordered ball crossings and reproducible time steps', () => {
+  const low = createTrial('technique', 1, 42, 100, { technique: 10, pace: 10 });
+  const high = createTrial('technique', 1, 42, 100, { technique: 90, pace: 90 });
+  for (const t of [low, high]) { controlTrial(t, { type: 'steer', direction: { x: 0, y: -1 } }); tickTrial(t, .5); }
+  assert.ok(high.player.y < low.player.y); assert.ok(high.gate >= 1);
+  const a = createTrial('technique', 1, 42), b = structuredClone(a);
+  for (const t of [a, b]) controlTrial(t, { type: 'steer', direction: { x: .25, y: -.75 } });
+  tickTrial(a, 1); for (let i = 0; i < 40; i++) tickTrial(b, .025);
+  assert.ok(Math.hypot(a.player.x - b.player.x, a.player.y - b.player.y) < .001);
+  assert.equal(a.gate, b.gate); assert.equal(a.collisions, b.collisions);
+});
+
+test('goal result and the rendered ball share the same complete line crossing; saves stop in front of the line', () => {
+  const scored = kick('shoot', { x: 300, y: 60 });
+  assert.equal(scored.shot!.decision, 'goal');
+  assert.ok(scored.shot!.ball.position.z + scored.shot!.ball.radius < scored.shot!.goalLine.z);
+  assert.equal(scored.referee.signal, 'goal');
+  const saved = kick('shoot', { x: keeperAt(0), y: 60 });
+  assert.equal(saved.outcome, 'save'); assert.ok(saved.shot!.ball.position.z > saved.shot!.goalLine.z); assert.notEqual(saved.shot!.decision, 'goal');
+  const offside = kick('vision', { x: 330, y: 120 });
+  assert.equal(offside.outcome, 'offside'); assert.equal(offside.referee.signal, 'offside'); assert.equal(offside.shot!.offsideSnapshot!.offside, true);
+});
