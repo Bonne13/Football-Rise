@@ -1,37 +1,59 @@
-# Football Rise — entorno dos estádios abertos
+# Football Rise — identidade por estádio e país, torcida por campanha
 
-**Capturas reais da versão em desenvolvimento, para revisão. O jogo público ainda não foi atualizado.**
+**Capturas reais da versão em desenvolvimento. O jogo público ainda não foi atualizado.**
 
-O entorno ganhou quarteirões, casas e edifícios baixos com fachadas e telhados, ruas conectadas, calçadas, travessias, portões/bilheterias, estacionamento, carros com rodas e vidros, árvores, postes e bancos. O bairro acompanha também estádios em cenários de montanha e litoral; o mar fica distante, sem praia colada na arquibancada.
+O sistema atende todos os **238 clubes do catálogo** — [confira a lista completa de clubes, estádios e países](clubes-estadios.md). Os traçados de ruas/acessos variam por estádio; clubes que dividem o mesmo local mantêm o mesmo cenário. País, cidade, porte e tipologia orientam materiais, telhados, fachadas, vegetação e disposição das construções. Há famílias de objetos reutilizáveis, mas o entorno não repete o mesmo conjunto de quatro ruas. São interpretações aproximadas, sem georreferenciamento das ruas reais.
 
-O objetivo desta revisão é melhorar a paisagem vista de dentro dos estádios abertos. São cenários procedurais aproximados, sem reprodução geográfica exata das ruas reais.
+## São Januário — bairro compacto e acesso histórico estilizado
 
-## São Januário — bairro e acessos
+![São Januário com malha irregular de bairro compacto](29-sao-januario.png)
 
-![São Januário com quarteirões, ruas, estacionamento e acessos](29-sao-januario.png)
+## Vila Belmiro — casas, comércio e torres residenciais
 
-![Vista de campo em São Januário com o bairro ao fundo](30-field-sao-januario.png)
+![Vila Belmiro com blocos residenciais e prédios de diferentes alturas](29-vila-belmiro.png)
 
-## Vila Belmiro — entorno de um estádio menor
+## Dean Court — parque, bosque e campo auxiliar
 
-![Vila Belmiro e construções próximas](29-vila-belmiro.png)
+![Dean Court em área verde com acesso lateral e estacionamento](29-dean-court.png)
 
-![Paisagem vista durante o exercício na Vila Belmiro](30-field-vila-belmiro.png)
+## Ipurua — vale, terraços, escadas e apartamentos
 
-## Dean Court — estádio pequeno e aberto
+![Ipurua com construções elevadas e acesso em desnível](29-ipurua.png)
 
-![Dean Court e seu entorno procedural](29-dean-court.png)
+## Maracanã — praça, avenidas e corredor de transporte
 
-![Vista de campo em Dean Court](30-field-dean-court.png)
+![Maracanã com praça de chegada, avenidas e corredor ferroviário estilizado](29-maracana.png)
 
-## Ipurua — bairro e relevo distante
+## França — Parc des Princes
 
-![Ipurua com bairro e montanhas](29-ipurua.png)
+![Entorno interpretado com paleta francesa](32-paris.png)
 
-![Entorno visível de dentro de Ipurua](30-field-ipurua.png)
+## Alemanha — Allianz Arena
 
-## Maracanã — comparação em uma arena grande
+![Arena com entorno de parque e paleta alemã](32-munich.png)
 
-![Maracanã com acessos e bairro](29-maracana.png)
+## Itália — Stadio Olimpico
 
-[Baixar estas imagens](previas-entorno.zip) · [Prévia dos estádios por clube](previas-estadios.md) · [Treinos e VAR](previas-treinos.md) · [Mira sem alvo final](previas-mira-var.md)
+![Estádio em contexto urbano com cores e materiais italianos](32-rome.png)
+
+## Torcida — a mesma arena com campanha boa
+
+A ocupação usa a reputação e os seis últimos resultados do mandante. No início sem resultados, a demanda fica neutra. A base atrai menos público que o profissional.
+
+![Público da arena após sequência simulada de vitórias](35-crowd-winning.png)
+
+## Torcida — a mesma arena com campanha ruim
+
+![Menor ocupação após sequência simulada de derrotas](36-crowd-losing.png)
+
+## Reação ao gol em casa
+
+![Torcida da casa comemora o gol do protagonista](37-crowd-goal.png)
+
+## Reação ao gol do visitante
+
+![Torcida da casa lamenta o gol sofrido quando o protagonista joga fora](38-crowd-away-goal.png)
+
+Nos treinos, as arquibancadas ficam vazias. Os sons são sintetizados e respeitam pausa/silêncio; não usam cantos licenciados.
+
+[Baixar as imagens](previas-identidades-torcida.zip) · [Prévia anterior do entorno](previas-entorno-anterior.md) · [Estádios por clube](previas-estadios.md) · [Treinos e VAR](previas-treinos.md)
