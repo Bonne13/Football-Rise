@@ -1,21 +1,41 @@
-# Football Rise — identificação do VAR e mira sem alvo final
+# Football Rise — estádios por clube, VAR e treinos
 
-**Capturas reais da versão em desenvolvimento. O jogo público ainda não recebeu estas alterações.**
+**Capturas reais da versão em desenvolvimento. O jogo público ainda não foi atualizado.**
 
-Cada profissional está identificado na sua bancada: **VAR — árbitro de vídeo**, **AVAR — assistente VAR** e **operador de replay**. Os três continuam sentados, com roupas lisas.
+Os 238 clubes do catálogo têm um estádio de referência histórica associado. Há formatos retangulares, bowls e ovais, coberturas, fachadas, pistas, assentos e entornos diferentes. Clubes que dividem estádio mantêm o mesmo local, como Flamengo/Fluminense e Inter/Milan.
 
-A mira mantém a trajetória, sem o alvo no destino. Puxar para trás define direção e força; soltar confirma. Só então aparece a bola para escolher a curva e chutar com um toque. A puxada curta mantém a direção e ignora pequenos tremores laterais.
+São **recriações procedurais aproximadas**, sem modelos ou imagens oficiais. As capacidades são faixas visuais arredondadas. Reformas, nomes patrocinados e mandos temporários de 2026/27 ainda precisam de confirmação; estas imagens não representam uma reconstrução arquitetônica exata.
 
-## Mira sem alvo no final
+## Maracanã — Flamengo e Fluminense
 
-![Mira confirmada sem marcador no destino; bola disponível apenas para curva](12-refined-aim.png)
+![Maracanã: volume oval, cobertura e assentos em azul e amarelo](27-maracana.png)
 
-## Cada integrante identificado
+## Nilton Santos — Botafogo
 
-![VAR, AVAR e operador de replay identificados individualmente](17-var-room.png)
+![Nilton Santos: pista de atletismo e arquibancadas afastadas do campo](27-nilton-santos.png)
 
-## Visualização no celular
+## Anfield — Liverpool
 
-![Central do VAR no celular](21-var-mobile.png)
+![Anfield: estádio retangular e arquibancadas próximas](27-anfield.png)
 
-[Baixar estas imagens](previas-mira-var.zip) · [Uniformes da arbitragem](previas-arbitragem.md) · [Sequência do VAR](previas-var.md) · [Jogadores e animações](previas-pixel-art.md)
+## Santiago Bernabéu — Real Madrid
+
+![Bernabéu: fachada com faixas metálicas e cobertura](27-bernabeu.png)
+
+## Allianz Arena — Bayern
+
+![Allianz Arena: bowl coberto e assentos vermelhos](27-allianz-arena.png)
+
+## Vila Belmiro — Santos
+
+![Vila Belmiro: estádio menor e arquibancadas próximas](27-vila-belmiro.png)
+
+## San Siro — Inter e Milan
+
+![San Siro: recriação aproximada do estádio compartilhado](27-san-siro.png)
+
+## VAR de costas para a câmera, voltado às telas
+
+![Três profissionais sentados diante dos monitores](17-var-room.png)
+
+[Baixar as imagens](previas-estadios-treinos.zip) · [Ver os ajustes nos quatro treinamentos e no celular](previas-treinos.md) · [Mira sem alvo final](previas-mira-var.md) · [Uniformes da arbitragem](previas-arbitragem.md)
