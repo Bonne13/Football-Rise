@@ -1,55 +1,41 @@
-# Football Rise — seis formatos especiais funcionando
+# Football Rise — condução de bola e avanço de temporada
 
-**Imagens reais da versão em desenvolvimento. O jogo público ainda aguarda aprovação visual.**
+**Capturas reais da versão em desenvolvimento. Publicação do jogo ainda aguarda aprovação visual.**
 
-Foram implementados os formatos disponíveis de **MLS (2025), Argentina (2025), Colômbia (2025), México (2024/25), Bélgica e Grécia (2025/26)**. São referências históricas explícitas; não representam uma conferência integral de regulamentos de 2026/27.
+## Treinos de condução com portões numerados
 
-## MLS: conferências, wild cards e melhor de três
+Três percursos diferentes: slalom, cortes/mudanças de direção e zigue-zague. O próximo trecho fica indicado no gramado. A bola e os pés acompanham o deslocamento; colisões com cones prejudicam a nota.
 
-34 jogos por clube; conferências reais Leste/Oeste; sete vagas diretas e wild card entre 8º e 9º. A primeira rodada é melhor de três, com terceiro jogo apenas se necessário. Depois, semifinais/finais de conferência e MLS Cup.
+![Circuito de condução](59-dribble-circuit.png)
 
-![Formato MLS](50-mls-formato.png)
+![Percurso de cortes e mudanças de direção](65-dribble-layout.png)
 
-![Conferências MLS](51-mls-conferencias.png)
+## Condução durante a partida
 
-![Wild cards da MLS](52-mls-wildcards.png)
+Defensores pressionam a bola e podem recuperar a posse. Há companheiros e corredores de avanço, sem cones nem balizas de treinamento. Condução bem-sucedida prepara a finalização seguinte, usando a posição física da bola ao sair da jogada.
 
-![Primeira rodada em melhor de três](53-mls-melhor-tres.png)
+![Situação de partida com pressão adversária](61-match-carry.png)
 
-## México: Apertura, Clausura e play-in
+## Direcional e aceleração no celular
 
-Torneios independentes; seis vagas diretas; 7×8, 9×10 e repescagem pela última vaga. Quartas/semifinais resemeadas e em ida/volta, com vantagem da classificação em empate agregado; na final não há essa vantagem.
+Um dedo conduz; o outro segura o botão de aceleração. Soltar freia. No computador, WASD/setas movimentam e Shift acelera. Acelerar aumenta a velocidade, alonga o toque na bola e exige mais cuidado nas curvas. Pausa e cancelamento liberam os comandos.
 
-![Play-in mexicano](54-mexico-playin.png)
+![Condução com dois dedos no celular](63-dribble-mobile.png)
 
-## Colômbia: quadrangulares e final em dois jogos
+## Playoffs, prorrogação e troca de divisão
 
-Apertura e Finalización têm campeões próprios. Após 20 partidas por clube, oito avançam aos quadrangulares com pontos zerados. Cabeças de chave têm vantagem no empate em pontos; os vencedores fazem final em ida/volta.
+Playoffs ingleses com duas semifinais em ida/volta e final única. Acesso/descenso funciona somente com divisões completas e encerradas. O pacote atual permite o caminho Premier League/Championship; divisões incompletas não inventam participantes.
 
-![Quadrangulares colombianos](55-colombia-quadrangulares.png)
+![Playoffs ingleses de acesso](67-playoffs-access.png)
 
-## Bélgica: grupos de título, Europa e permanência
+A próxima temporada mantém os clubes promovidos/rebaixados nas divisões corretas, sem retornar ao snapshot antigo. A regra brasileira troca quatro clubes com duas divisões de 20; a Série B do pacote atual tem 18, portanto esse caminho fica suspenso nele. A regra foi testada com cadastro completo adicional.
 
-30 jogos iniciais; divisão 6/6/4; pontuação dividida por dois e arredondada para cima nos dois primeiros grupos. A permanência mantém a pontuação integral.
+![Premier League na temporada seguinte](69-new-season.png)
 
-![Grupos belgas](56-belgica-grupos.png)
+Prorrogação foi ligada às fases compatíveis nas novas versões dos regulamentos. Fases de pênaltis diretos continuam distintas; partidas antigas preservam suas regras. Vagas continentais oficiais e acesso/descenso de outros sistemas seguem pendentes.
 
-## Argentina: dois campeões por temporada
+## Verificação
 
-Zonas A/B de 15; 16 jogos por clube, incluindo dois interzonais. Oito primeiros por zona disputam o mata-mata em jogo único; final sem vantagem de mando na simulação. Apertura e Clausura possuem resultados e troféus separados.
+Testes do domínio e build passaram. O navegador concluiu os três circuitos por teclado, validou pausa/cancelamento, ritmo, pressão adversária, continuidade condução/chute e aceleração com dois dedos. Também encerrou as nove edições especiais, verificou cinco jogos do playoff inglês, exibiu prorrogação e salvou/recarregou a virada com três promovidos e 20 clubes na Premier League.
 
-![Clausura argentina concluída](57-argentina-clausura.png)
-
-## Grécia no celular
-
-26 jogos iniciais; grupos 4/4/6. Apenas o grupo 5–8 recebe metade dos pontos, arredondada para cima. Campeão sai do grupo de título.
-
-![Liga grega no celular](58-grecia-celular.png)
-
-## Validação e limites
-
-Testes automáticos, build e navegador passaram. As nove edições especiais encerraram com campeão, preservando saves anteriores e retomada determinística. O teste de navegador também salvou/recarregou o mundo completo de aproximadamente 11 MB e conferiu o layout móvel.
-
-Calendários usam datas adaptadas à carreira. Sorteios são simulados; acesso/descenso, vagas externas, repescagens europeias, prorrogação e critérios disciplinares específicos continuam pendentes. Elencos novos continuam sem jogadores reais inventados.
-
-[Baixar as nove imagens](previas-formatos-especiais.zip) · [Regras e cobertura detalhadas](regulamentos-cobertura.md) · [Prévia anterior dos regulamentos](previas-regulamentos-v1.md) · [Estádios e torcida](previas-identidades.md) · [Treinos e VAR](previas-treinos.md)
+[Todas as variações e chute após condução](conducao-variacoes.md) · [Baixar as onze imagens](previas-conducao-temporada.zip) · [Controles e comportamento](conducao-controles.md) · [Regras e cobertura](regulamentos-cobertura.md) · [Seis formatos especiais](previas-formatos-especiais.md) · [Estádios e torcida](previas-identidades.md)
