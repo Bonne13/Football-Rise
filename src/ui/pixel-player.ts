@@ -1,6 +1,7 @@
 import type { Kit } from '../data/kits.js';
-export const SPRITE_SIZE = { width: 64, height: 80, frames: 50, directions: 4 } as const;
+export const SPRITE_SIZE = { width: 64, height: 80, frames: 54, directions: 4 } as const;
 export const PLAYER_ANIMATIONS = {
+  'assistant-flag': { label: 'Bandeirinha · impedimento', start: 50, count: 4, fps: 5, loop: false },
   header: { label: 'Cabeceio', start: 8, count: 4, fps: 6, loop: true },
   bicycle: { label: 'Bicicleta', start: 12, count: 6, fps: 7, loop: true },
   volley: { label: 'Voleio', start: 18, count: 4, fps: 7, loop: true },
@@ -80,7 +81,7 @@ export function paintPixelPlayers(canvas: HTMLCanvasElement, kit: Kit, number: n
     };
     leg(side ? 21 : 18, stride, true); leg(side ? 24 : 26, -stride, false);
     const arm = (x: number, offset: number, far: boolean) => {
-      const lifted = frame === 7 || action === 'celebrate' || ((action.endsWith('-card') || action === 'offside') && pose.step > 0 && !far);
+      const lifted = frame === 7 || action === 'celebrate' || ((action.endsWith('-card') || action === 'offside' || action === 'assistant-flag') && pose.step > 0 && !far);
       rect(x, lifted ? 17 : 23, 4, 7, training ? '#edf0e8' : kit.shirt);
       rect(x, lifted ? 13 : 29 + Math.min(0, offset), 3, lifted ? 7 : 7 + Math.abs(offset), far ? skinShadow : skin);
       rect(x + (side ? 2 : 0), lifted ? 10 : 35 + offset, 3, 3, skin);
@@ -114,6 +115,7 @@ export function paintPixelPlayers(canvas: HTMLCanvasElement, kit: Kit, number: n
     else { rect(21, 12, 1, 1, '#17222b'); rect(27, 12, 1, 1, '#17222b'); rect(24, 13, 1, 2, skinShadow); rect(23, 16, 3, 1, skinShadow); }
     c.restore();
     if (action.endsWith('-card') && pose.step > 0) { rect(side ? 29 : 32, 5, 5, 7, '#18222c'); rect(side ? 30 : 33, 6, 3, 5, action === 'red-card' ? '#f34043' : '#ffdd40'); }
+    if (action === 'assistant-flag' && pose.step > 0) { rect(34, 1, 1, 15, '#dce4db'); rect(35, 1, 7, 6, '#ffd744'); rect(35, 1, 3, 3, '#f58c36'); rect(38, 4, 4, 3, '#f58c36'); }
     c.restore();
   }
 }

@@ -92,3 +92,7 @@ Save v3 migra versões anteriores, sem criar estatísticas retroativas. A aprese
 ### Revisão de personagens, controles e arbitragem
 
 Atletas em pixel art/2D por escolha do usuário, no estádio 3D existente; uniformes e números desenhados no sprite. Condução contínua por toque/mouse/teclado e calibração de mira/força. Biblioteca de animações com cabeceio, bicicleta, voleio, comemoração, cartões, lesão e sinais do árbitro; somente comemoração/sinais de gol/impedimento já ligados aos eventos jogáveis. Bola, linha externa do gol e corpos elegíveis para impedimento são objetos do domínio, com passagem inteira da esfera e snapshot no passe. Revisão visual da bola/linha pela pausa. Permanecem pendentes arbitragem disciplinar completa, lesões efetivas durante partidas, cruzamentos/disputas aéreas e integração competitiva de todos os movimentos especiais.
+
+### Assistentes e apresentação do VAR
+
+Dois bandeirinhas ligados à linha de impedimento e à participação do receptor; monitor à beira do campo, corrida do árbitro e take da central com VAR/AVAR/operador e seis telas com evidência congelada. Sequência automática para gols/impedimentos jogáveis e repetição pela pausa, sem alterar resultado ou duplicar registro. Protocolo cinematográfico simplificado; revisão disciplinar e demais classes oficiais continuam pendentes.

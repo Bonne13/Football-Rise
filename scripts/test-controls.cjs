@@ -92,9 +92,9 @@ const server = createServer(async (req, res) => {
       const url = document.querySelector('script[type=module]').src;
       const { paintPixelPlayers, PLAYER_ANIMATIONS, SPRITE_SIZE } = await import(url.replace('ui/browser.js', 'ui/pixel-player.js'));
       const { clubKits } = await import(url.replace('ui/browser.js', 'data/kits.js'));
-      const canvas = document.createElement('canvas'); canvas.id = 'animation-sheet'; canvas.width = 1000; canvas.height = 1480;
-      canvas.style.cssText = 'position:absolute;left:0;top:0;z-index:10000;width:1000px;height:1480px'; document.body.append(canvas);
-      const ctx = canvas.getContext('2d'); ctx.fillStyle = '#101e2b'; ctx.fillRect(0, 0, 1000, 1480); ctx.imageSmoothingEnabled = false;
+      const canvas = document.createElement('canvas'); canvas.id = 'animation-sheet'; canvas.width = 1000; canvas.height = 1650;
+      canvas.style.cssText = 'position:absolute;left:0;top:0;z-index:10000;width:1000px;height:1650px'; document.body.append(canvas);
+      const ctx = canvas.getContext('2d'); ctx.fillStyle = '#101e2b'; ctx.fillRect(0, 0, 1000, 1650); ctx.imageSmoothingEnabled = false;
       ctx.fillStyle = '#eef7ed'; ctx.font = 'bold 25px sans-serif'; ctx.fillText('FOOTBALL RISE · SPRITES E ANIMAÇÕES', 30, 42);
       ctx.font = '15px sans-serif'; ctx.fillText('Prévia de poses · lances especiais, cartões e lesão são demonstrações', 30, 70);
       let row = 0;
