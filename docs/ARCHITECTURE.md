@@ -129,3 +129,8 @@ A animação 3D deriva deslocamento dos atletas para passada, direção, braços
 ## Força pela mira e atributos
 
 A seleção do ponto de contato não carrega potência nem executa chute: seus gestos ajustam somente curva e elevação. A puxada da mira no campo fornece a carga, mostrada em percentual e velocidade estimada. `strikeVelocity` no domínio combina força, técnica e a habilidade do fundamento (finalização, passe ou bola parada) para calcular o teto; a carga multiplica esse teto. O chute recebe a velocidade calculada, que determina seu tempo de voo pela distância. É uma calibração de protótipo, sem simulação aerodinâmica. No teclado, espaço executa com carga máxima. Saves e resultados confirmados continuam no formato existente.
+
+
+## Sequência única de mira, força e curva
+
+A puxada confirma simultaneamente destino e potência ao soltar, sem executar o chute. A bola ampliada só aparece após essa confirmação. A seleção fica bloqueada no campo até o botão explícito de alterar mira. Tocar na esfera seleciona apenas curva lateral e, ao soltar esse toque, executa o chute com o destino e a potência guardados; o centro produz chute reto. Não há segunda puxada nem seleção de elevação nesse fluxo. Pausa e cancelamento do contato preservam os valores confirmados. Cancelar a puxada antes da confirmação descarta a preparação sem chutar. Esta sequência substitui o disparo ao soltar a mira descrito nas revisões anteriores.

@@ -17,18 +17,25 @@ await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:x+18
 assert.equal(await p.locator('.field-stage').getAttribute('data-phase'),'preparing');assert.equal(await p.locator('#aim-reticle').isVisible(),true);
 await p.screenshot({path:join(screenshots,'prepare.png'),fullPage:true});
 await cdp.send('Input.dispatchTouchEvent',{type:'touchCancel',touchPoints:[]});await p.clock.runFor(1000);assert.equal(await p.locator('#field-next').isVisible(),false);
-// Contact dragging changes effects only, never force or firing.
-const ball=await p.locator('#contact-ball').boundingBox();const before=await p.locator('#shot-power-value').innerText();
-await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:ball.x+ball.width/2,y:ball.y+ball.height/2}]});
-await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:ball.x+ball.width/2+12,y:ball.y+ball.height/2+70}]});
-await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await p.clock.runFor(1000);
-assert.equal(await p.locator('#shot-power-value').innerText(),before);assert.equal(await p.locator('#field-next').isVisible(),false);assert.equal(await p.locator('.field-stage').getAttribute('data-phase'),'preparing');
+assert.equal(await p.locator('#contact-dock').isVisible(),false);
+// One pull locks both aim and charge; waiting and touching the field cannot require another aim.
+await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}]});
+await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:x+18,y:y+90}]});
+assert.equal(await p.locator('#contact-dock').isVisible(),false);
+await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await p.clock.runFor(1200);
+assert.equal(await p.locator('#contact-dock').isVisible(),true);assert.equal(await p.locator('#field-next').isVisible(),false);
+const before=await p.locator('#shot-power-value').innerText();const target=await p.locator('#aim-reticle').getAttribute('style');
+await touch(x+80,y);await p.clock.runFor(100);assert.equal(await p.locator('#aim-reticle').getAttribute('style'),target);assert.equal(await p.locator('#shot-power-value').innerText(),before);
 // Pause freezes presentation and exposes real sound preferences.
 await p.locator('#field-pause').click();assert.equal(await p.locator('#pause-menu').isVisible(),true);
 await p.locator('#field-sound').click();assert.equal(await p.locator('#field-sound').innerText(),'Som: desligado');
 assert.equal(await p.evaluate(()=>localStorage.getItem('football-rise.sound-muted')),'true');
-await p.locator('#field-resume').click();await p.locator('#aim-reset').click();
-await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}]});await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:x+18,y:y+90}]});await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+await p.locator('#field-resume').click();assert.equal(await p.locator('#shot-power-value').innerText(),before);
+// Canceling contact preserves the confirmed charge; tapping the sphere fires with it.
+let ball=await p.locator('#contact-ball').boundingBox();
+await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:ball.x+ball.width/2,y:ball.y+ball.height/2}]});
+await cdp.send('Input.dispatchTouchEvent',{type:'touchCancel',touchPoints:[]});assert.equal(await p.locator('#shot-power-value').innerText(),before);assert.equal(await p.locator('#field-next').isVisible(),false);
+await touch(ball.x+ball.width*.57,ball.y+ball.height/2);assert.equal(await p.locator('#shot-power-value').innerText(),before);
 assert.equal(await p.locator('.field-stage').getAttribute('data-phase'),'flight');await p.locator('#football-field').press('Escape');const frozen=await p.locator('#field-clock').innerText();await p.clock.runFor(2000);assert.equal(await p.locator('#field-clock').innerText(),frozen);assert.equal(await p.locator('#field-next').isVisible(),false);await p.locator('#field-resume').click();await p.clock.runFor(1200);assert.equal(await p.locator('#field-next').isVisible(),true);
 // Exit from pause confirms the last action without needing the next button.
 await p.locator('#field-pause').click();await p.locator('#field-exit').click();assert.equal(await p.evaluate(()=>document.body.classList.contains('field-screen')),false);
