@@ -1,5 +1,7 @@
+import { ASSOCIATIONS, associationFor } from '../../data/associations.js';
+import { LEAGUE_SNAPSHOTS, membershipFor } from '../../data/league-snapshots.js';
 import { addDays, ageOn, draw, requireRule } from '../../core/rules.js';
-import { BRAZIL_STATES, CUP_SPECS, EUROPE, SOUTH_AMERICA, NATIONAL_TEAMS, brazilState } from '../../data/competitions.js';
+import { BRAZIL_STATES, CUP_SPECS, EUROPE, SOUTH_AMERICA, NORTH_AMERICA, CENTRAL_AMERICA, NATIONAL_TEAMS, brazilState } from '../../data/competitions.js';
 import type { CareerState, Club, Performance } from '../career/state.js';
 import { calculateOverall } from '../player/player.js';
 export interface Team { id: string; name: string; country: string; strength: number; national: boolean }
@@ -69,24 +71,41 @@ function addTournament(w: CompetitionWorld, key: string, name: string, ids: stri
     // Seeded pots distribute the strongest teams across groups instead of stacking them together.
     const count = Math.max(1, Math.ceil(ids.length / 4)); t.groups = Array.from({ length: count }, () => []);
     ids.forEach((id, i) => t.groups[i % count]!.push(id));
-    t.groups.forEach((group, i) => roundRobin(w, t, group, date, 'groups', undefined, i, key === 'libertadores'));
+    t.groups.forEach((group, i) => roundRobin(w, t, group, date, 'groups', undefined, i, ['libertadores','sudamericana'].includes(key)));
   } else knockout(w, t, ids, date, 1);
 }
 export function createWorld(clubs: readonly Club[], seed: number, date: string, previous?: CompetitionWorld, protagonistId = `player-${seed}`): CompetitionWorld {
   const season = seasonOn(date);
   const w: CompetitionWorld = { version: 1, protagonistId, season, rng: seed >>> 0, lastDate: date, teams: clubs.map(c => ({ id: c.id, name: c.name, country: c.country, strength: c.squadOverall, national: false })), tournaments: [], fixtures: [], stats: [], awards: structuredClone(previous?.awards ?? []), history: structuredClone(previous?.history ?? []) };
-  const countries = [...new Set(clubs.map(c => c.country))].sort();
+  const countries = [...new Set([...ASSOCIATIONS.map(a => a.country), ...clubs.map(c => c.country)])].sort();
   const previousRank = new Map<string, number>();
   for (const t of previous?.tournaments ?? []) if (t.key.startsWith('league:')) standings(previous!, t).forEach((row, i) => previousRank.set(row.teamId, i));
   const ranked = sortedTeams(clubs).sort((a, b) => (previousRank.get(a.id) ?? 99) - (previousRank.get(b.id) ?? 99));
   for (const country of countries) {
-    const ids = ranked.filter(c => c.country === country).map(c => c.id);
-    addTournament(w, `league:${country}`, `Liga nacional · ${country}`, ids, 'league', 'senior', startDate(season, 8, 8));
-    addTournament(w, `youth:${country}`, `Liga da base · ${country}`, ids, 'league', 'youth', addDays(`${season}-07-01`, 7));
-    addTournament(w, `cup:${country}`, country === 'Brasil' ? 'Copa do Brasil' : `Copa nacional · ${country}`, ids, 'cup', 'senior', startDate(season, 10, 7));
+    const association = associationFor(country);
+    const domesticKey = `league:${country}`;
+    const ids = ranked.filter(c => (membershipFor(c)?.key ?? `league:${c.country}`) === domesticKey).map(c => c.id);
+    if (!association || association.leagueName) addTournament(w, domesticKey, association?.leagueName ?? `Liga nacional · ${country}`, ids, 'league', 'senior', startDate(season, 8, 8));
+    const national = ranked.filter(c => c.country === country).map(c => c.id);
+    if (national.length) addTournament(w, `youth:${country}`, `Liga da base · ${country}`, national, 'league', 'youth', addDays(`${season}-07-01`, 7), Math.min(18, national.length - 1));
+    const cupIds = ranked.filter(c => (membershipFor(c)?.leagueCountry === 'Inglaterra' ? 'Inglaterra' : c.country) === country).map(c => c.id);
+    const cupNames: Record<string,string> = { Brasil:'Copa do Brasil', Inglaterra:'FA Cup', Espanha:'Copa del Rey', Itália:'Coppa Italia', Alemanha:'DFB-Pokal', França:'Coupe de France', Portugal:'Taça de Portugal', México:'Copa nacional · México (simulada)', Canadá:'Canadian Championship', 'Estados Unidos':'US Open Cup' };
+    addTournament(w, `cup:${country}`, cupNames[country] ?? `Copa nacional · ${country}`, cupIds, 'cup', 'senior', startDate(season, 10, 7));
+  }
+  for (const snapshot of LEAGUE_SNAPSHOTS) if (snapshot.division > 1) {
+    const ids = ranked.filter(c => membershipFor(c)?.key === snapshot.key).map(c => c.id);
+    addTournament(w, snapshot.key, snapshot.name.replace(/\s20\d{2}(?:\/\d{2,4})?$/, ''), ids, 'league', 'senior', startDate(season, 8, 9));
+  }
+  for (const country of countries) {
+    const ids = ranked.filter(c => membershipFor(c)?.key === `unclassified:${country}`).map(c => c.id);
+    if (ids.length) addTournament(w, `unclassified:${country}`, `Grupo auxiliar · ${country} (divisão não confirmada)`, ids, 'league', 'senior', startDate(season, 8, 10));
+  }
+  for (const t of w.tournaments) {
+    const snapshot = LEAGUE_SNAPSHOTS.find(s => s.key === t.key);
+    if (snapshot && t.participants.length) t.notice += ` Participantes de referência: ${snapshot.season}; cadastro pode ser parcial e não confirma a edição 2026/27.`;
   }
   for (const [state, meta] of Object.entries(BRAZIL_STATES)) addTournament(w, `state:${state}`, `Campeonato ${meta.name}`, ranked.filter(c => c.country === 'Brasil' && brazilState(c.name) === state).map(c => c.id), 'cup', 'senior', startDate(season, 1, 10));
-  const european = ranked.filter(c => EUROPE.includes(c.country)); const used = new Set<string>();
+  const european = ranked.filter(c => EUROPE.includes(c.country) && associationFor(c.country)?.continentalEligible !== false && (membershipFor(c)?.division ?? 1) === 1); const used = new Set<string>();
   for (const spec of CUP_SPECS.filter(c => ['champions', 'europa', 'conference'].includes(c.key))) {
     // Country quotas first; vacancies then filled from remaining eligible clubs. No overlapping berths.
     const chosen: string[] = [];
@@ -95,10 +114,22 @@ export function createWorld(clubs: readonly Club[], seed: number, date: string, 
     const ids = chosen.slice(0, 36); ids.forEach(id => used.add(id));
     addTournament(w, spec.key, spec.name, ids, spec.format, 'senior', startDate(season, spec.startMonth, spec.startDay), spec.rounds);
   }
-  const lib = CUP_SPECS.find(c => c.key === 'libertadores')!;
-  const south = ranked.filter(c => SOUTH_AMERICA.includes(c.country));
-  const ids = countries.flatMap(country => south.filter(c => c.country === country).slice(0, 8).map(c => c.id)).slice(0, 32);
-  addTournament(w, lib.key, lib.name, ids, lib.format, 'senior', startDate(season, lib.startMonth, lib.startDay));
+  const continental = (key: string, eligible: readonly Club[], take: number, used: Set<string> = new Set()) => {
+    const spec = CUP_SPECS.find(s => s.key === key)!;
+    const pool: string[] = [];
+    for (const country of countries) pool.push(...eligible.filter(c => c.country === country && !used.has(c.id)).slice(0, 4).map(c => c.id));
+    for (const c of eligible) if (pool.length < take && !pool.includes(c.id) && !used.has(c.id)) pool.push(c.id);
+    const ids = pool.slice(0,take); ids.forEach(id => used.add(id));
+    addTournament(w,key,spec.name,ids,spec.format,'senior',startDate(season,spec.startMonth,spec.startDay),spec.rounds);
+  };
+  const topTier = ranked.filter(c => (membershipFor(c)?.division ?? 1) === 1);
+  const south = topTier.filter(c => SOUTH_AMERICA.includes(c.country)), southUsed = new Set<string>();
+  continental('libertadores',south,32,southUsed); continental('sudamericana',south,32,southUsed);
+  const north = topTier.filter(c => NORTH_AMERICA.includes(c.country));
+  continental('concacaf-champions',north,27);
+  continental('central-american',north.filter(c => CENTRAL_AMERICA.includes(c.country)),20);
+  continental('caribbean',north.filter(c => !CENTRAL_AMERICA.includes(c.country) && !['Estados Unidos','Canadá','México'].includes(c.country)),10);
+  continental('leagues-cup',north.filter(c => ['Estados Unidos','Canadá','México'].includes(c.country)),48);
   const edition = (season + 1) % 4 === 2 ? season + 1 : season;
   if (edition % 4 === 2 && !previous?.tournaments.some(t => t.key === 'world-cup' && t.name === `Copa do Mundo ${edition}`)) {
     const nations = [...NATIONAL_TEAMS];

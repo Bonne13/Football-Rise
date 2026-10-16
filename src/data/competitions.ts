@@ -1,9 +1,15 @@
+import { countriesIn } from './associations.js';
 export interface CompetitionSpec { key: string; name: string; scope: 'national' | 'continental' | 'international' | 'state' | 'youth'; format: 'league' | 'cup' | 'league-knockout' | 'groups'; rounds: number; startMonth: number; startDay: number }
 export const CUP_SPECS: CompetitionSpec[] = [
   { key: 'champions', name: 'Champions League', scope: 'continental', format: 'league-knockout', rounds: 8, startMonth: 9, startDay: 16 },
   { key: 'europa', name: 'Europa League', scope: 'continental', format: 'league-knockout', rounds: 8, startMonth: 9, startDay: 17 },
   { key: 'conference', name: 'Conference League', scope: 'continental', format: 'league-knockout', rounds: 6, startMonth: 10, startDay: 1 },
   { key: 'libertadores', name: 'Copa Libertadores', scope: 'continental', format: 'groups', rounds: 6, startMonth: 3, startDay: 3 },
+  { key: 'sudamericana', name: 'Copa Sudamericana', scope: 'continental', format: 'groups', rounds: 6, startMonth: 3, startDay: 5 },
+  { key: 'concacaf-champions', name: 'CONCACAF Champions Cup', scope: 'continental', format: 'cup', rounds: 5, startMonth: 2, startDay: 3 },
+  { key: 'central-american', name: 'CONCACAF Central American Cup', scope: 'continental', format: 'groups', rounds: 4, startMonth: 8, startDay: 4 },
+  { key: 'caribbean', name: 'CONCACAF Caribbean Cup', scope: 'continental', format: 'groups', rounds: 4, startMonth: 8, startDay: 6 },
+  { key: 'leagues-cup', name: 'Leagues Cup', scope: 'continental', format: 'groups', rounds: 3, startMonth: 7, startDay: 20 },
   { key: 'world-cup', name: 'Copa do Mundo', scope: 'international', format: 'groups', rounds: 3, startMonth: 6, startDay: 1 },
 ];
 export const BRAZIL_STATES: Record<string, { name: string; clubs: string[] }> = {
@@ -16,6 +22,8 @@ export const BRAZIL_STATES: Record<string, { name: string; clubs: string[] }> = 
   SP: { name: 'Paulista', clubs: ['Corinthians', 'Palmeiras', 'Santos', 'São Paulo', 'Red Bull Bragantino', 'Bragantino', 'Mirassol', 'Novorizontino', 'Ponte Preta', 'Guarani', 'Botafogo-SP', 'São Bernardo', 'Ferroviária', 'União do Vale'] }, SE: { name: 'Sergipano', clubs: ['Confiança', 'Sergipe'] }, TO: { name: 'Tocantinense', clubs: ['Tocantinópolis', 'Palmas'] },
 };
 export function brazilState(name: string): string | null { return Object.entries(BRAZIL_STATES).find(([, state]) => state.clubs.includes(name))?.[0] ?? null; }
-export const EUROPE = ['Inglaterra', 'Espanha', 'Itália', 'Alemanha', 'França', 'Portugal', 'Países Baixos', 'Bélgica', 'Escócia', 'Turquia', 'Áustria', 'Suíça', 'Dinamarca', 'Noruega', 'Suécia', 'Croácia', 'Sérvia', 'Grécia', 'Polônia', 'República Tcheca', 'Ucrânia'];
-export const SOUTH_AMERICA = ['Brasil', 'Argentina', 'Uruguai', 'Chile', 'Paraguai', 'Bolívia', 'Peru', 'Equador', 'Colômbia', 'Venezuela'];
+export const EUROPE = countriesIn('UEFA');
+export const SOUTH_AMERICA = countriesIn('CONMEBOL');
+export const NORTH_AMERICA = countriesIn('CONCACAF');
+export const CENTRAL_AMERICA = ['Belize', 'Costa Rica', 'El Salvador', 'Guatemala', 'Honduras', 'Nicarágua', 'Panamá'];
 export const NATIONAL_TEAMS = ['Brasil', 'Argentina', 'França', 'Espanha', 'Inglaterra', 'Portugal', 'Alemanha', 'Países Baixos', 'Itália', 'Bélgica', 'Uruguai', 'Colômbia', 'Croácia', 'Marrocos', 'Japão', 'Senegal', 'Suíça', 'Dinamarca', 'Estados Unidos', 'México', 'Canadá', 'Equador', 'Áustria', 'Turquia', 'Noruega', 'Suécia', 'Polônia', 'Sérvia', 'Ucrânia', 'Escócia', 'República Tcheca', 'Grécia', 'Nigéria', 'Egito', 'Argélia', 'Tunísia', 'Costa do Marfim', 'Gana', 'Camarões', 'África do Sul', 'Coreia do Sul', 'Irã', 'Austrália', 'Arábia Saudita', 'Catar', 'Uzbequistão', 'Panamá', 'Costa Rica'];
