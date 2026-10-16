@@ -71,3 +71,15 @@ O início foi inspirado na sequência do Game-teste: **finalização, visão, pa
 O tempo começa na primeira ação. Na mira, o relógio pausa enquanto você segura. Use **Próxima tentativa** para salvar o resultado; **Pausar e voltar** permite continuar depois, inclusive após recarregar. Tentativas já confirmadas ficam no navegador; uma tentativa ainda não confirmada recomeça. A exportação do save da carreira não inclui sessões parciais de campo.
 
 Depois da avaliação, **Praticar no campo** usa três tentativas e aplica desenvolvimento de acordo com a nota (nota zero gasta energia sem melhorar atributos). Na preparação da estreia, **Entrar em campo** oferece passe, finalização, condução e falta; gols e nota de atuação vêm dos resultados, sem formulário manual. Esta é uma partida por oportunidades, ainda sem simulação de 90 minutos ou companheiros controlados por IA. Saves existentes continuam funcionando; jogadores já avaliados podem testar os novos controles pelos treinos e pela próxima partida.
+
+### Campo e mira 3D
+
+O campo usa WebGL/Three.js com câmera por trás do jogador, bola esférica texturizada, jogadores, goleiro, trave/rede, trajetória e rastro em 3D. As geometrias são procedurais; a biblioteca Three.js é distribuída localmente com sua licença MIT, sem depender de CDN.
+
+1. **Toque no gol** para escolher a mira (no gramado em passes).
+2. Na **bola ampliada sobre o campo**, toque no ponto desejado: nas laterais produz efeito; embaixo aumenta a elevação. Um toque simples escolhe o contato e não chuta.
+3. **Puxe essa bola para baixo** para carregar a potência e solte. Em 100%, a trajetória alcança a mira selecionada; puxadas menores produzem bolas mais curtas.
+
+O arrasto reverso diretamente no gramado continua disponível. A linha e o marcador 3D mostram o destino antes do chute, e os controles de efeito/elevação também podem ser ajustados pelos seletores. Passes e condução selecionam destinos por raycasting no gramado. A câmera acompanha o jogador na condução.
+
+Para celulares sem WebGL, o jogo avisa e abre o campo 2D automaticamente, mantendo os fundamentos por arrasto no campo. O modo gráfico não modifica o formato dos saves ou as regras de resultados.

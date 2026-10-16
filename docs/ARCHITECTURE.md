@@ -89,7 +89,7 @@ Critérios do protótipo: aos 15 anos, promoção exige 6 atuações, 270 minuto
 
 ## Fundamentos jogáveis e referência Game-teste
 
-Referência consultada somente para leitura: `Bonne13/Game-teste`, commit `a07d70cf9164fb7743ee4ff5066b1aa260e3aad6`, em especial `training-engine.js`, `training.js` e `match-input.js`. Foram reutilizados conceitos de arrasto reverso, três tentativas por fundamento, antecipação de passes, obstrução de trajetória, impedimento, barreira/efeito e condução. Não foram copiados banco de clubes, marcas, assets nem a arquitetura global do protótipo. O renderer é Canvas 2D com perspectiva, sem biblioteca 3D externa.
+Referência consultada somente para leitura: `Bonne13/Game-teste`, commit `a07d70cf9164fb7743ee4ff5066b1aa260e3aad6`, em especial `training-engine.js`, `training.js` e `match-input.js`. Foram reutilizados conceitos de arrasto reverso, três tentativas por fundamento, antecipação de passes, obstrução de trajetória, impedimento, barreira/efeito e condução. Não foram copiados banco de clubes, marcas, assets nem a arquitetura global do protótipo. O primeiro renderer foi Canvas 2D com perspectiva; ele permanece como fallback. A versão atual usa a apresentação 3D descrita abaixo.
 
 - `src/domain/gameplay/trial.ts`: estado local de cada tentativa, entradas, tempo, movimento, colisões e resultados. Subpassos separam regras da frequência de renderização.
 - `src/application/drills.ts`: sequência de fundamentos, histórico de notas, retomada e projeção dos resultados em atributos/atuação. Força, marcação, defesa de gol e compostura usam estimativas derivadas; não são testes específicos dessas habilidades nesta etapa.
@@ -97,3 +97,13 @@ Referência consultada somente para leitura: `Bonne13/Game-teste`, commit `a07d7
 - `src/ui/browser.ts`: grava sessões confirmadas em armazenamento separado, sem alterar o formato versionado 1 da carreira. Ao concluir, aplica o resultado pelos casos de uso existentes. Falhas de persistência mantêm o estado anterior.
 
 A estreia é um conjunto limitado de oportunidades controláveis, que pode produzir gols reais e uma nota de atuação calculada. Passe recebido não conta automaticamente como assistência. A integração não afirma que exista uma simulação completa de partidas ou equipes. O `Game-teste` permanece independente e inalterado.
+
+## Apresentação 3D e ponto de contato
+
+`src/ui/field3d.ts` traduz as coordenadas de domínio para metros, desenha a cena com Three.js r160 e expõe somente renderização e seleção por raycasting. Campo, gol com rede, personagens, arquibancada e textura da bola são criados por código. A biblioteca em `web/vendor/three.min.js` foi reutilizada do Game-teste (commit de referência acima), sem alterações, com a licença MIT em `web/vendor/THREE-LICENSE.txt`. O pacote `@types/three` é dependência somente de desenvolvimento. O Game-teste não foi alterado.
+
+O contato usa uma segunda cena com esfera e raycasting: lateral vira curva e metade inferior vira elevação. Selecionar contato é separado de finalizar. A força vem da distância de arrasto, enquanto a mira vem da interseção do toque com o plano do gol/gramado. A trajetória e o voo compartilham a interpolação de caminho do domínio. As regras de resultado e as notas continuam em `src/domain/gameplay`/`src/application`. Não se trata de física completa de corpos rígidos.
+
+O adaptador `field.ts` mantém um único ciclo de animação e descarta ambos os renderizadores, geometrias, materiais, texturas, observadores e listeners ao sair. O tamanho do buffer só muda quando o layout muda; a densidade de pixels é limitada a 1,5. As cadeiras usam instanciamento para reduzir chamadas de desenho. Sem WebGL, os canvases são substituídos e o renderer 2D é ativado sem tentar reutilizar um contexto incompatível.
+
+O build inclui a biblioteca e a licença em `dist-web/vendor/`. O grafo de módulos e as URLs dos recursos recebem versão de conteúdo para evitar a mistura de arquivos antigos após uma atualização no Pages.

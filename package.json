@@ -10,8 +10,9 @@
     "build:web": "npm run build && node scripts/build-web.mjs"
   },
   "devDependencies": {
-    "typescript": "^5.9.0",
-    "@types/node": "24.19.2"
+    "@types/node": "24.19.2",
+    "@types/three": "0.160.0",
+    "typescript": "^5.9.0"
   },
   "engines": {
     "node": ">=24 <25"
