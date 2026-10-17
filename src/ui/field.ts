@@ -7,7 +7,7 @@ import { paintPixelPlayers, spriteFrame, SPRITE_SIZE, PLAYER_ANIMATIONS, type Pl
 import { reviewIncident, reviewFrame, reviewVerdict, REVIEW_STAGES, type ReviewIncident } from '../domain/match/video-review.js';
 import { VARroom } from './var-room.js';
 import { Field3D, type FieldAppearance } from './field3d.js';
-import { missReception, trialZone, createTrial, strikeVelocity, controlTrial, tickTrial, ballPath, keeperAt, teammateAt, type Point, type Trial } from '../domain/gameplay/trial.js';
+import { receivingPlayers, missReception, trialZone, createTrial, strikeVelocity, controlTrial, tickTrial, ballPath, keeperAt, teammateAt, type Point, type Trial } from '../domain/gameplay/trial.js';
 import { canRetryTrial, recordTrial, sessionAverage, type DrillSession } from '../application/drills.js';
 export const DRILL_NAMES = { shoot: 'Finalização', vision: 'Visão de jogo', pass: 'Passe', speed: 'Velocidade', technique: 'Condução e drible', freekick: 'Falta' };
 const hints = { shoot: 'Puxe no campo para mirar e dosar a força. Depois, toque na bola ampliada para escolher a curva e chutar.', vision: 'Passe para um companheiro livre. A linha laranja marca o impedimento. Puxe na direção oposta ao passe.', pass: 'Antecipe o companheiro azul em movimento. Puxe e solte, evitando os defensores vermelhos.', speed: 'Arraste: quanto mais longe, mais rápido. Desloque para os lados para trocar de faixa; solte para frear. WASD ou setas no computador.', technique: 'Arraste no gramado como um direcional para conduzir; solte para frear. Um toque manda correr até o ponto. Atravesse os portões em ordem com a bola.', freekick: 'Puxe no campo para definir mira e força. Depois toque na bola para escolher a curva e chutar.' };
@@ -101,7 +101,7 @@ export function mountField(host: HTMLElement, options: Options): () => void {
     trial = createTrial(kind, session.results.length + 1, session.seed, 100, options.attributes,session.mode==='match'?'match':'training');
     const previous=session.results.at(-1);if(kind==='shoot'&&previous?.carry){trial.origin={...previous.carry};trial.player={x:trial.origin.x-40,y:trial.origin.y+25};}
     $('dribble-sprint').hidden=kind!=='technique';
-    selectedAim = kind === 'pass' ? teammateAt(.85, trial.layout) : kind === 'vision' ? { ...trial.mates[0]! } : { ...trial.target };
+    selectedAim = kind === 'pass' ? teammateAt(0, trial.layout) : kind === 'vision' ? { ...trial.mates[0]! } : { ...trial.target };
     $('drill-name').textContent = DRILL_NAMES[kind];
     $('drill-counter').textContent = `${session.results.length + 1} / ${session.sequence.length}`;
     $('field-zone').textContent = `${['shoot', 'freekick'].includes(kind) ? (trial.layout === 0 ? 'Frente do gol' : trial.layout === 1 ? 'Lado esquerdo' : 'Lado direito · longa distância') : trial.layout === 0 ? 'Meio-campo' : trial.layout === 1 ? 'Meio-campo · lado esquerdo' : 'Meio-campo · lado direito'} · cenário ${trial.layout + 1}/3`;
@@ -323,8 +323,9 @@ export function mountField(host: HTMLElement, options: Options): () => void {
       pixelSheets.set(key, sheet);
     }
     const v = project(p), scale = .6 + p.y / 1320 * .4;
-    const moving = user && !!trial?.started && !trial.resolved && (trial.kind === 'speed' && trial.velocity.y > .15 || trial.kind === 'technique' && Math.hypot(trial.velocity.x, trial.velocity.y) > 4);
-    const frame = spriteFrame(trial?.kind==='technique'?trial.travel/450:trial?.kind==='speed'?trial.distance/9:presentationTime, moving, user && trial?.shot ? trial.shot.elapsed : null);
+    const receiving = !user && !!trial?.shot?.support && Math.hypot(p.x-trial.shot.support.position.x,p.y-trial.shot.support.position.y)<.01;
+    const moving = receiving && Math.hypot(trial!.shot!.support!.velocity.x,trial!.shot!.support!.velocity.y)>1 || user && !!trial?.started && !trial.resolved && (trial.kind === 'speed' && trial.velocity.y > .15 || trial.kind === 'technique' && Math.hypot(trial.velocity.x, trial.velocity.y) > 4);
+    const frame = receiving && trial!.shot!.support!.stretching ? trial!.shot!.support!.controlled ? 6 : 5 : spriteFrame(trial?.kind==='technique'?trial.travel/450:trial?.kind==='speed'?trial.distance/9:presentationTime, moving, user && trial?.shot ? trial.shot.elapsed : null);
     disc(p, 16, '#0005'); ctx!.imageSmoothingEnabled = false;
     ctx!.drawImage(sheet, frame * SPRITE_SIZE.width, (user ? 1 : 0) * SPRITE_SIZE.height, SPRITE_SIZE.width, SPRITE_SIZE.height, Math.round(v.x - 48 * scale), Math.round(v.y - 104 * scale), Math.round(96 * scale), Math.round(120 * scale));
   }
@@ -340,6 +341,7 @@ export function mountField(host: HTMLElement, options: Options): () => void {
     }
     $('crowd-status').hidden = !crowd;
     if (crowd) { const status = trial?.resolved ? crowdReaction(crowd, trial.outcome).message : `Público estimado: ${crowd.attendance.toLocaleString('pt-BR')} · ${Math.round(crowd.occupancy * 100)}% · torcida ${crowd.mood}`; if ($('crowd-status').textContent !== status) $('crowd-status').textContent = status; }
+    canvas.dataset.receiver = trial?.shot?.support ? JSON.stringify(trial.shot.support) : '';
     canvas.dataset.shot = trial?.shot ? JSON.stringify({ keeper: trial.shot.goalkeeper, curve: trial.shot.curve, startHeight: trial.shot.startHeight ?? .11, position: trial.shot.ball.position }) : '';
     canvas.dataset.speed = trial?.kind === 'speed' ? JSON.stringify({ x: trial.player.x, lane: trial.lane, lateral: trial.velocity.x, forward: trial.velocity.y, demand: trial.runDemand }) : '';
     canvas.dataset.previewReach = String(power);
@@ -387,8 +389,8 @@ export function mountField(host: HTMLElement, options: Options): () => void {
       actor({ x: t.origin.x - 38, y: t.origin.y + 38 }, options.appearance.kit.shirt, String(options.appearance.number));
       if (t.kind === 'pass' || t.kind === 'vision') {
         t.defenders.forEach(p => actor(p, '#ee6659'));
-        if (t.kind === 'pass') actor(teammateAt(t.time, t.layout), '#6fd8ff', 'COMPANHEIRO');
-        else { line([{ x: 0, y: t.offsideLine }, { x: 880, y: t.offsideLine }], '#ffa348', 5); t.mates.forEach((p, i) => actor(p, '#6fd8ff', String(i + 1))); }
+        if (t.kind === 'pass') receivingPlayers(t).forEach(p=>actor(p,'#6fd8ff','COMPANHEIRO'));
+        else { line([{ x: 0, y: t.offsideLine }, { x: 880, y: t.offsideLine }], '#ffa348', 5); receivingPlayers(t).forEach((p, i) => actor(p, '#6fd8ff', String(i + 1))); }
       } else {
         actor({ x: t.shot?.keeper ?? keeperAt(t.time), y: 95 }, '#6fd8ff');
         if (t.kind === 'freekick') [360, 410, 460, 510].forEach(x => actor({ x, y: 720 }, '#ee6659'));
@@ -397,8 +399,8 @@ export function mountField(host: HTMLElement, options: Options): () => void {
         ctx!.setLineDash([10, 14]); line(Array.from({ length: 25 }, (_, i) => ballPath(t.origin, aim!, i / 24 * power * (t.kind === 'freekick' ? .65 : t.kind === 'shoot' ? .85 : 1), Number(curve.value))), '#dcff83', 6); ctx!.setLineDash([]);
       }
       if (t.shot) {
-        const u = Math.min(1, t.shot.elapsed / t.shot.duration), p = ballPath(t.shot.from, t.shot.end, u, t.shot.curve), v = project(p);
-        disc(p, 15, '#0005'); ctx!.fillStyle = '#fff'; ctx!.beginPath(); ctx!.arc(v.x, v.y - Math.sin(u * Math.PI) * (90 + t.shot.lift * 160), 7, 0, Math.PI * 2); ctx!.fill();
+        const body=t.shot.ball.position, p={x:440+body.x*(400/7.32),y:95+(body.z-trialZone(t.kind,t.layout))*50},v=project(p);
+        disc(p, 10, '#0005'); ctx!.fillStyle='#fff';ctx!.beginPath();ctx!.arc(v.x,v.y-body.y*45,7,0,Math.PI*2);ctx!.fill();
       } else if (phase !== 'aiming') disc(t.origin, 7, '#fff');
     }
     $('field-clock').textContent = !t.started ? 'AGUARDANDO SUA AÇÃO' : `${t.time.toFixed(1)} s`;
@@ -412,7 +414,7 @@ export function mountField(host: HTMLElement, options: Options): () => void {
     if (reception && confirmed && !overview && !paused && !document.hidden && trial && !trial.resolved) {
       reception.elapsed += dt; const incoming = receptionFrame(reception);
       const dock = $('contact-dock'); dock.dataset.timing = incoming.canStrike ? 'strike' : 'wait'; dock.dataset.reception = reception.kind;
-      contactCanvas.style.transform = `translate(${incoming.x * 20}px, ${-incoming.height * 8}px)`;
+      contactCanvas.style.transform = '';
       dock.querySelector('small')!.textContent = incoming.canStrike ? 'AGORA! TOQUE PARA FINALIZAR' : 'ESPERE A BOLA CHEGAR';
       $('drill-hint').textContent = `${reception.kind === 'left-cross' ? 'Cruzamento da esquerda' : reception.kind === 'right-cross' ? 'Cruzamento da direita' : 'Bola quicando'} · toque na bola quando aparecer AGORA. Centro = reto; lados = curva.`;
       canvas.dataset.reception = JSON.stringify({ ...incoming, elapsed: reception.elapsed, contactAt: reception.contactAt });

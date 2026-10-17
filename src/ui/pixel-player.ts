@@ -65,7 +65,7 @@ export function paintPixelPlayers(canvas: HTMLCanvasElement, kit: Kit, number: n
     const stride = frame >= 54 ? [0,-2,-4,-2,0,2,4,2][(frame-54)%8]! : frame >= 1 && frame <= 4 ? [0, -3, 0, 3][frame - 1]! : 0;
     const bob = frame >= 54 ? [0,-1,-2,-1,0,-1,-2,-1][(frame-54)%8]! : frame === 2 || frame === 4 ? -1 : 0;
     const rect = (x: number, y: number, w: number, h: number, color: string) => { c.fillStyle = color; c.fillRect(x, y + bob, w, h); };
-    // Far limbs are shaded; bent knees and alternating boots form a eight-frame run cycle.
+    // Far limbs are shaded; bent knees and alternating boots form an eight-frame run cycle.
     const leg = (x: number, offset: number, far: boolean) => {
       if (action === 'volley' && !far && pose.step > 0 && pose.step < 3) { rect(x, 39, 4, 6, skin); rect(x + 3, 38, 9, 4, skin); rect(x + 11, 38, 6, 4, kit.socks); rect(x + 16, 38, 4, 6, '#102133'); return; }
       const knee = !far && (frame === 6 || action === 'volley') ? -7 : action === 'bicycle' ? (far ? 9 : -9) : action === 'injury' ? (far ? -3 : -6) : frame === 5 && !far ? 5 : offset;
@@ -96,6 +96,7 @@ export function paintPixelPlayers(canvas: HTMLCanvasElement, kit: Kit, number: n
       if (kit.pattern === 'stripe') for (let x = left + 3; x < left + width; x += 5) rect(x, 22, 2, 16, kit.secondary);
       else for (let y = 25; y < 38; y += 6) rect(left, y, width, 2, kit.secondary);
     }
+    rect(left+2,22,2,1,'#ffffff30'); rect(left+width-4,22,2,1,'#ffffff20');
     rect(left, 23, 1, 14, '#00000038'); rect(left + width - 1, 23, 1, 14, '#00000038');
     rect(left + 2, 24, 1, 10, '#ffffff16'); rect(left, 37, width, 1, kit.secondary);
     c.restore();
@@ -118,4 +119,9 @@ export function paintPixelPlayers(canvas: HTMLCanvasElement, kit: Kit, number: n
     if (action === 'assistant-flag' && pose.step > 0) { rect(34, 1, 1, 15, '#dce4db'); rect(35, 1, 7, 6, '#ffd744'); rect(35, 1, 3, 3, '#f58c36'); rect(38, 4, 4, 3, '#f58c36'); }
     c.restore();
   }
+  const contour=document.createElement('canvas');contour.width=canvas.width;contour.height=canvas.height;
+  const oc=contour.getContext('2d')!;oc.drawImage(canvas,0,0);oc.globalCompositeOperation='source-in';oc.fillStyle='#101c26d9';oc.fillRect(0,0,contour.width,contour.height);
+  c.save();c.globalCompositeOperation='destination-over';for(const [x,y] of [[-1,0],[1,0],[0,-1],[0,1]])c.drawImage(contour,x!,y!);c.restore();
+  contour.width=contour.height=0;
+
 }

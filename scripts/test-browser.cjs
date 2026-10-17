@@ -24,16 +24,16 @@ await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:x+18
 assert.equal(await p.locator('#contact-dock').isVisible(),false);
 await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await p.clock.runFor(1200);
 assert.equal(await p.locator('#contact-dock').isVisible(),true);assert.equal(await p.locator('#field-next').isVisible(),false);
-const before=await p.locator('#shot-power-value').innerText();const target=await p.locator('#football-field').getAttribute('data-aim');
-await touch(x+80,y);await p.clock.runFor(100);assert.equal(await p.locator('#football-field').getAttribute('data-aim'),target);assert.equal(await p.locator('#shot-power-value').innerText(),before);
+const before=await p.locator('#shot-power-value').textContent();const target=await p.locator('#football-field').getAttribute('data-aim');
+await touch(r.x+10,r.y+r.height*.5);await p.clock.runFor(100);assert.equal(await p.locator('#football-field').getAttribute('data-aim'),target);assert.equal(await p.locator('#shot-power-value').textContent(),before);
 // Pause freezes presentation and exposes real sound preferences.
 await p.locator('#field-pause').click();assert.equal(await p.locator('#pause-menu').isVisible(),true);
 await p.locator('#field-sound').click();assert.equal(await p.locator('#field-sound').innerText(),'Som: desligado');
 assert.equal(await p.evaluate(()=>localStorage.getItem('football-rise.sound-muted')),'true');
-await p.locator('#field-resume').click();assert.equal(await p.locator('#shot-power-value').innerText(),before);
+await p.locator('#field-resume').click();assert.equal(await p.locator('#shot-power-value').textContent(),before);
 // A single timed contact executes the shot with the already confirmed charge.
 const incoming = JSON.parse(await p.locator('#football-field').getAttribute('data-reception'));await p.clock.runFor(Math.max(0,(incoming.contactAt-incoming.elapsed)*1000));
-let ball=await p.locator('#contact-ball').boundingBox();await touch(ball.x+ball.width*.57,ball.y+ball.height/2);assert.equal(await p.locator('#shot-power-value').innerText(),before);
+let ball=await p.locator('#contact-ball').boundingBox();await touch(ball.x+ball.width*.57,ball.y+ball.height/2);assert.equal(await p.locator('#shot-power-value').textContent(),before);
 assert.equal(await p.locator('.field-stage').getAttribute('data-phase'),'flight');await p.locator('#football-field').press('Escape');const frozen=await p.locator('#field-clock').innerText();await p.clock.runFor(2000);assert.equal(await p.locator('#field-clock').innerText(),frozen);assert.equal(await p.locator('#field-next').isVisible(),false);await p.locator('#field-resume').click();await p.clock.runFor(1600);assert.equal(await p.locator('#field-next').isVisible(),true);
 // Exit from pause confirms the last action without needing the next button.
 await p.locator('#field-pause').click();await p.locator('#field-exit').click();assert.equal(await p.evaluate(()=>document.body.classList.contains('field-screen')),false);

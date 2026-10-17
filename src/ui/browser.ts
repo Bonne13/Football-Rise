@@ -66,6 +66,7 @@ let playing: { mode: DrillSession['mode']; focus: Focus | null } | null = null;
 let disposeField: (() => void) | undefined;
 const drillForFocus: Record<Focus, Drill> = { finishing: 'shoot', passing: 'pass', defending: 'vision', goalkeeping: 'vision', pace: 'speed', technique: 'technique', vision: 'vision', setPieces: 'freekick' };
 function startField(mode: DrillSession['mode'], focus: Focus | null = null) {
+  clearTimeout(timer); notice.hidden = true;
   page = 'career'; playing = { mode, focus }; render(); app.scrollIntoView({ block: 'start' });
 }
 function render() {

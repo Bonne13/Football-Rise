@@ -22,7 +22,7 @@ test('free kicks must clear the wall and still beat a reacting goalkeeper', () =
 });
 test('passing anticipates teammate arrival and defenders intercept blocked paths', () => {
   const precise = kick('pass', teammateAt(.85)); assert.equal(precise.outcome, 'received'); assert.ok(precise.score > 95);
-  assert.equal(kick('pass', { x: 400, y: 200 }).outcome, 'intercepted');
+  assert.equal(kick('pass', { x: 560, y: 370 }).outcome, 'intercepted');
 });
 test('vision rejects offside but permits a free teammate behind the defensive line', () => {
   assert.equal(kick('vision', { x: 150, y: 310 }).outcome, 'received');

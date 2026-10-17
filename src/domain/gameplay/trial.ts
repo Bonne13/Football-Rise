@@ -1,3 +1,4 @@
+import { createReceiver, moveReceiver, segmentContact, type ReceiverState } from './receiver.js';
 import { createKeeper, moveKeeper, keeperTouches, type KeeperState } from './goalkeeper.js';
 import { BALL_RADIUS, NEAR_GOAL, judgeGoal, judgeOffside, type BallBody, type GoalLine, type GoalDecision, type OffsideSnapshot } from '../match/adjudication.js';
 import type { Attributes } from '../player/player.js';
@@ -5,7 +6,7 @@ import { bounded, draw, requireRule } from '../../core/rules.js';
 export const DRILLS = ['shoot', 'vision', 'pass', 'speed', 'technique', 'freekick'] as const;
 export type Drill = typeof DRILLS[number];
 export interface Point { x: number; y: number }
-export interface Shot { goalkeeper: KeeperState; startHeight?: number; from: Point; end: Point; curve: number; lift: number; elapsed: number; duration: number; receiver: Point | null; offside: boolean; keeper: number; ball: BallBody; goalLine: GoalLine; decision: GoalDecision | null; offsideSnapshot: OffsideSnapshot | null; stoppedBy: 'keeper' | 'wall' | null }
+export interface Shot { support: ReceiverState | null; goalkeeper: KeeperState; startHeight?: number; from: Point; end: Point; curve: number; lift: number; elapsed: number; duration: number; receiver: Point | null; offside: boolean; keeper: number; ball: BallBody; goalLine: GoalLine; decision: GoalDecision | null; offsideSnapshot: OffsideSnapshot | null; stoppedBy: 'keeper' | 'wall' | null }
 export interface Trial {
   context:'training'|'match'; runDemand:number; sprint:boolean; ballTravel:number;
   shotSeed: number; kind: Drill; attempt: number; layout: number; time: number; started: boolean; resolved: boolean; score: number;
@@ -115,7 +116,8 @@ export function controlTrial(t: Trial, input: TrialInput) {
   const errorX = draw(t.shotSeed, 0, 1000).value / 500 - 1, errorY = draw((t.shotSeed + 17) >>> 0, 0, 1000).value / 500 - 1;
   const end = { x: input.aim.x + errorX * spread, y: input.aim.y + errorY * spread * .7 };
   const stoppedBy = t.kind === 'freekick' && input.lift < .6 && blockedPath(t.origin, end, [{ x: 360, y: 720 }, { x: 410, y: 720 }, { x: 460, y: 720 }, { x: 510, y: 720 }], input.curve) ? 'wall' : null;
-  t.shot = { goalkeeper: createKeeper(), ...(input.startHeight !== undefined ? { startHeight: input.startHeight } : {}), from: { ...t.origin }, end, elapsed: 0, duration, curve: input.curve, lift: input.lift, receiver, offside: snapshot?.offside ?? false, keeper: keeperAt(t.time),
+  const receiverIndex = receiver ? t.mates.indexOf(receiver) : 0;
+  t.shot = { support: receiving ? createReceiver(receiving,receiverIndex) : null, goalkeeper: createKeeper(), ...(input.startHeight !== undefined ? { startHeight: input.startHeight } : {}), from: { ...t.origin }, end, elapsed: 0, duration, curve: input.curve, lift: input.lift, receiver: receiving ? {...receiving} : null, offside: snapshot?.offside ?? false, keeper: keeperAt(t.time),
     ball: { position: fieldBody(t.origin, zone), radius: BALL_RADIUS }, goalLine: { ...NEAR_GOAL }, decision: null, offsideSnapshot: snapshot, stoppedBy };
 }
 /** The renderer and referee use this exact ball body, not a separate goal animation. */
@@ -139,6 +141,23 @@ function step(t: Trial, dt: number) {
   t.time += dt;
   if (t.shot) {
     const s = t.shot, previous = { ...s.ball.position }; s.elapsed = Math.min(s.duration, s.elapsed + dt); s.ball.position = shotBallPosition(t, s.elapsed);
+    if ((t.kind === 'pass' || t.kind === 'vision') && s.support) {
+      const support=s.support, before={...support.position}, u=s.elapsed/s.duration;
+      const previousPoint={x:440+previous.x*(400/7.32),y:95+(previous.z-trialZone(t.kind,t.layout))*50};
+      const currentPoint=ballPath(s.from,s.end,u,s.curve);
+      moveReceiver(support,ballPath(s.from,s.end,Math.min(1,Math.max(.95,u+.12/s.duration)),s.curve),currentPoint,s.elapsed,dt);
+      s.receiver={...support.position};
+      const defenderHits=t.defenders.map(p=>segmentContact(previousPoint,currentPoint,p,35)).filter((n):n is number=>n!==null);
+      const defenderHit=defenderHits.length?Math.min(...defenderHits):null;
+      const catchHit=segmentContact({x:previousPoint.x-before.x,y:previousPoint.y-before.y},{x:currentPoint.x-support.position.x,y:currentPoint.y-support.position.y},{x:0,y:0},support.stretching?52:28);
+      if(defenderHit!==null&&(catchHit===null||defenderHit<=catchHit)){finish(t,0,'Passe interceptado. Procure uma linha livre.','intercepted');return;}
+      if(catchHit!==null&&s.ball.position.y<=.8){
+        if(s.offside){finish(t,0,'Impedimento! Posição registrada no momento do passe.','offside');return;}
+        support.controlled=true; support.velocity={x:0,y:0};
+        s.ball.position={x:(support.position.x-440)/(400/7.32),y:BALL_RADIUS,z:(support.position.y-95)/50+trialZone(t.kind,t.layout)};
+        finish(t,100-Math.max(0,distance(s.end,support.position)-20)*.1,support.stretching?'O companheiro esticou a perna e dominou o passe!':'Passe dominado pelo companheiro.','received');return;
+      }
+    }
     if (t.kind === 'shoot' || t.kind === 'freekick') {
       const prediction = shotBallPosition(t, Math.min(s.duration, s.elapsed + .2));
       moveKeeper(s.goalkeeper, s.ball.position, prediction, s.elapsed, dt); s.keeper = 440 + s.goalkeeper.x * (400 / 7.32);
@@ -155,10 +174,7 @@ function step(t: Trial, dt: number) {
     }
     if (s.elapsed < s.duration) return;
     if (t.kind === 'pass' || t.kind === 'vision') {
-      if (blockedPath(s.from, s.end, t.defenders, s.curve)) { finish(t, 0, 'Passe interceptado. Procure uma linha livre.', 'intercepted'); return; }
-      const gap = distance(s.end, s.receiver ?? teammateAt(t.time, t.layout));
-      if (gap < 65 && s.offside) { finish(t, 0, 'Impedimento! Posição registrada no momento do passe.', 'offside'); return; }
-      finish(t, gap < 65 ? 100 - gap : 0, gap < 65 ? 'Passe recebido! Boa leitura da jogada.' : 'O passe não encontrou o companheiro. Antecipe o movimento.', gap < 65 ? 'received' : 'wide'); return;
+      finish(t,0,'O companheiro tentou alcançar, mas a bola ficou fora do seu alcance.','wide');return;
     }
     if (s.stoppedBy === 'wall') { finish(t, 0, 'Na barreira! Use efeito ou elevação.', 'wall'); return; }
     if (s.stoppedBy === 'keeper') { finish(t, 0, 'O goleiro defendeu antes da linha. Sem gol.', 'save'); return; }
@@ -206,4 +222,9 @@ function step(t: Trial, dt: number) {
   }
   const limit = t.kind === 'technique' ? 22 : t.kind === 'speed' ? 18 : 15;
   if (t.time >= limit) finish(t, t.kind === 'technique' ? Math.max(0, t.gate * 15 - t.collisions * 15) : 0, 'Tempo encerrado. Tente de novo na próxima tentativa.', 'timeout');
+}
+
+export function receivingPlayers(t: Trial): Point[] {
+  if(t.kind==='pass') return [t.shot?.support?.position ?? teammateAt(t.time,t.layout)];
+  return t.mates.map((p,i)=>t.shot?.support?.index===i?t.shot.support.position:p);
 }
