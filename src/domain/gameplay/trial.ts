@@ -1,4 +1,5 @@
-import { createReceiver, moveReceiver, segmentContact, type ReceiverState } from './receiver.js';
+import { createCarry, stepCarry, type CarryState } from './carry.js';
+import { createReceiver, moveReceiver, receiverRouteTarget, segmentContact, type ReceiverState } from './receiver.js';
 import { createKeeper, moveKeeper, keeperTouches, type KeeperState } from './goalkeeper.js';
 import { BALL_RADIUS, NEAR_GOAL, judgeGoal, judgeOffside, type BallBody, type GoalLine, type GoalDecision, type OffsideSnapshot } from '../match/adjudication.js';
 import type { Attributes } from '../player/player.js';
@@ -6,9 +7,9 @@ import { bounded, draw, requireRule } from '../../core/rules.js';
 export const DRILLS = ['shoot', 'vision', 'pass', 'speed', 'technique', 'freekick'] as const;
 export type Drill = typeof DRILLS[number];
 export interface Point { x: number; y: number }
-export interface Shot { support: ReceiverState | null; goalkeeper: KeeperState; startHeight?: number; from: Point; end: Point; curve: number; lift: number; elapsed: number; duration: number; receiver: Point | null; offside: boolean; keeper: number; ball: BallBody; goalLine: GoalLine; decision: GoalDecision | null; offsideSnapshot: OffsideSnapshot | null; stoppedBy: 'keeper' | 'wall' | null }
+export interface Shot { receivers: ReceiverState[]; receiverSnapshots: OffsideSnapshot[]; support: ReceiverState | null; goalkeeper: KeeperState; startHeight?: number; from: Point; end: Point; curve: number; lift: number; elapsed: number; duration: number; receiver: Point | null; offside: boolean; keeper: number; ball: BallBody; goalLine: GoalLine; decision: GoalDecision | null; offsideSnapshot: OffsideSnapshot | null; stoppedBy: 'keeper' | 'wall' | null }
 export interface Trial {
-  context:'training'|'match'; runDemand:number; sprint:boolean; ballTravel:number;
+  context:'training'|'match'; runDemand:number; sprint:boolean; ballTravel:number; carry: CarryState;
   shotSeed: number; kind: Drill; attempt: number; layout: number; time: number; started: boolean; resolved: boolean; score: number;
   message: string; outcome: 'goal' | 'save' | 'wide' | 'wall' | 'received' | 'intercepted' | 'offside' | 'complete' | 'timeout' | null;
   origin: Point; aim: Point; target: Point; shot: Shot | null; player: Point; destination: Point | null;
@@ -40,7 +41,7 @@ export function createTrial(kind: Drill, attempt: number, seed: number, accuracy
   bounded(movement.technique, 0, 100); bounded(movement.pace, 0, 100);
   const layout = (seed % 3 + attempt - 1) % 3;
   const side = draw((seed + attempt) >>> 0, 0, 1).value;
-  const trial: Trial = { context,runDemand:1,sprint:false,ballTravel:0,shotSeed:(seed+attempt*7919)>>>0,kind, attempt, layout, time: 0, started: false, resolved: false, score: 0, message: '', outcome: null,
+  const trial: Trial = { context,runDemand:1,sprint:false,ballTravel:0,carry:createCarry(),shotSeed:(seed+attempt*7919)>>>0,kind, attempt, layout, time: 0, started: false, resolved: false, score: 0, message: '', outcome: null,
     origin: { x: 440, y: kind === 'freekick' ? 1100 : 950 }, aim: { x: 440, y: 65 }, target: { x: side ? 580 : 300, y: 60 },
     shot: null, player: { x: 440, y: 1170 }, destination: null,
     ball: { x: 440, y: 1150 }, velocity: { x: 0, y: 0 }, steering: null, travel: 0, handling: movement.technique, running: movement.pace,
@@ -117,7 +118,9 @@ export function controlTrial(t: Trial, input: TrialInput) {
   const end = { x: input.aim.x + errorX * spread, y: input.aim.y + errorY * spread * .7 };
   const stoppedBy = t.kind === 'freekick' && input.lift < .6 && blockedPath(t.origin, end, [{ x: 360, y: 720 }, { x: 410, y: 720 }, { x: 460, y: 720 }, { x: 510, y: 720 }], input.curve) ? 'wall' : null;
   const receiverIndex = receiver ? t.mates.indexOf(receiver) : 0;
-  t.shot = { support: receiving ? createReceiver(receiving,receiverIndex) : null, goalkeeper: createKeeper(), ...(input.startHeight !== undefined ? { startHeight: input.startHeight } : {}), from: { ...t.origin }, end, elapsed: 0, duration, curve: input.curve, lift: input.lift, receiver: receiving ? {...receiving} : null, offside: snapshot?.offside ?? false, keeper: keeperAt(t.time),
+  const receivers = (t.kind === 'vision' ? t.mates : receiving ? [receiving] : []).map((p,i)=>createReceiver(p,i));
+  const receiverSnapshots = receivers.map(r=>offsideAtPass(r.position,t.origin,[{x:440,y:95},...t.defenders],zone));
+  t.shot = { receivers, receiverSnapshots, support: receivers[receiverIndex] ?? null, goalkeeper: createKeeper(), ...(input.startHeight !== undefined ? { startHeight: input.startHeight } : {}), from: { ...t.origin }, end, elapsed: 0, duration, curve: input.curve, lift: input.lift, receiver: receiving ? {...receiving} : null, offside: snapshot?.offside ?? false, keeper: keeperAt(t.time),
     ball: { position: fieldBody(t.origin, zone), radius: BALL_RADIUS }, goalLine: { ...NEAR_GOAL }, decision: null, offsideSnapshot: snapshot, stoppedBy };
 }
 /** The renderer and referee use this exact ball body, not a separate goal animation. */
@@ -142,16 +145,26 @@ function step(t: Trial, dt: number) {
   if (t.shot) {
     const s = t.shot, previous = { ...s.ball.position }; s.elapsed = Math.min(s.duration, s.elapsed + dt); s.ball.position = shotBallPosition(t, s.elapsed);
     if ((t.kind === 'pass' || t.kind === 'vision') && s.support) {
-      const support=s.support, before={...support.position}, u=s.elapsed/s.duration;
+      const u=s.elapsed/s.duration;
       const previousPoint={x:440+previous.x*(400/7.32),y:95+(previous.z-trialZone(t.kind,t.layout))*50};
       const currentPoint=ballPath(s.from,s.end,u,s.curve);
-      moveReceiver(support,ballPath(s.from,s.end,Math.min(1,Math.max(.95,u+.12/s.duration)),s.curve),currentPoint,s.elapsed,dt);
-      s.receiver={...support.position};
+      const route=Array.from({length:13},(_,i)=>ballPath(s.from,s.end,u+(1-u)*i/12,s.curve));
+      const catches: { receiver: ReceiverState; fraction: number }[]=[];
+      for(const receiver of s.receivers){
+        const before={...receiver.position};
+        const target=receiver===s.support?ballPath(s.from,s.end,Math.min(1,Math.max(.95,u+.12/s.duration)),s.curve):receiverRouteTarget(receiver.position,route);
+        if(target)moveReceiver(receiver,target,currentPoint,s.elapsed,dt);
+        const contact=segmentContact({x:previousPoint.x-before.x,y:previousPoint.y-before.y},{x:currentPoint.x-receiver.position.x,y:currentPoint.y-receiver.position.y},{x:0,y:0},receiver.stretching?52:28);
+        if(contact!==null&&s.ball.position.y<=.8)catches.push({receiver,fraction:contact});
+      }
+      const catchHit=catches.sort((a,b)=>a.fraction-b.fraction||a.receiver.index-b.receiver.index)[0];
       const defenderHits=t.defenders.map(p=>segmentContact(previousPoint,currentPoint,p,35)).filter((n):n is number=>n!==null);
       const defenderHit=defenderHits.length?Math.min(...defenderHits):null;
-      const catchHit=segmentContact({x:previousPoint.x-before.x,y:previousPoint.y-before.y},{x:currentPoint.x-support.position.x,y:currentPoint.y-support.position.y},{x:0,y:0},support.stretching?52:28);
-      if(defenderHit!==null&&(catchHit===null||defenderHit<=catchHit)){finish(t,0,'Passe interceptado. Procure uma linha livre.','intercepted');return;}
-      if(catchHit!==null&&s.ball.position.y<=.8){
+      if(defenderHit!==null&&(!catchHit||defenderHit<=catchHit.fraction)){finish(t,0,'Passe interceptado. Procure uma linha livre.','intercepted');return;}
+      s.receiver={...s.support.position};
+      if(catchHit){
+        const support=catchHit.receiver;s.support=support;s.receiver={...support.position};
+        s.offsideSnapshot=s.receiverSnapshots[support.index]!;s.offside=s.offsideSnapshot.offside;
         if(s.offside){finish(t,0,'Impedimento! Posição registrada no momento do passe.','offside');return;}
         support.controlled=true; support.velocity={x:0,y:0};
         s.ball.position={x:(support.position.x-440)/(400/7.32),y:BALL_RADIUS,z:(support.position.y-95)/50+trialZone(t.kind,t.layout)};
@@ -206,10 +219,8 @@ function step(t: Trial, dt: number) {
     t.player.x = clamp(t.player.x + t.velocity.x * dt, 20, 860); t.player.y = clamp(t.player.y + t.velocity.y * dt, 100, 1290);
     t.travel += distance(previous, t.player);
     const previousBall={...t.ball};
-    const moving = Math.hypot(t.velocity.x, t.velocity.y), reach = (t.sprint?10:0) + 12 + (1 - t.handling / 100) * 9 + (Math.sin(t.travel / 18) + 1) * 3;
-    const ballTarget = moving > 3 ? { x: t.player.x + t.velocity.x / moving * reach, y: t.player.y + t.velocity.y / moving * reach } : t.player;
-    const touch = 1 - Math.exp(-(10 + t.handling * .12) * dt);
-    t.ball.x = clamp(t.ball.x + (ballTarget.x - t.ball.x) * touch, 10, 870); t.ball.y = clamp(t.ball.y + (ballTarget.y - t.ball.y) * touch, 90, 1300);
+    stepCarry(t.carry,t.ball,t.player,t.velocity,t.handling,t.sprint,dt);
+    t.ball.x=clamp(t.ball.x,10,870);t.ball.y=clamp(t.ball.y,90,1300);
     t.ballTravel+=distance(previousBall,t.ball);
     if(t.context==='match'){
       for(const defender of t.defenders){const dx=t.ball.x-defender.x,dy=t.ball.y-defender.y,d=Math.hypot(dx,dy);if(d<340&&d>1){const step=Math.min(d,(78+t.running*.15)*dt);defender.x+=dx/d*step;defender.y+=dy/d*step;}}
@@ -226,5 +237,5 @@ function step(t: Trial, dt: number) {
 
 export function receivingPlayers(t: Trial): Point[] {
   if(t.kind==='pass') return [t.shot?.support?.position ?? teammateAt(t.time,t.layout)];
-  return t.mates.map((p,i)=>t.shot?.support?.index===i?t.shot.support.position:p);
+  return t.mates.map((p,i)=>t.shot?.receivers[i]?.position??p);
 }

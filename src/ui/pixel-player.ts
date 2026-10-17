@@ -1,6 +1,7 @@
 import type { Kit } from '../data/kits.js';
-export const SPRITE_SIZE = { width: 64, height: 80, frames: 62, directions: 4 } as const;
+export const SPRITE_SIZE = { width: 64, height: 80, frames: 63, directions: 4 } as const;
 export const PLAYER_ANIMATIONS = {
+  seated: { label: 'Sentado · banco de reservas', start: 62, count: 1, fps: 1, loop: false },
   'assistant-flag': { label: 'Bandeirinha · impedimento', start: 50, count: 4, fps: 5, loop: false },
   header: { label: 'Cabeceio', start: 8, count: 4, fps: 6, loop: true },
   bicycle: { label: 'Bicicleta', start: 12, count: 6, fps: 7, loop: true },
@@ -50,23 +51,25 @@ function pixelNumber(c: CanvasRenderingContext2D, value: number, y: number, ink:
   c.fillStyle = ink; for (const p of pixels) c.fillRect(p.x, p.y, 1, 1);
 }
 /** Original hand-built pixel silhouettes. No external sprites, logos or licensed artwork. */
-export function paintPixelPlayers(canvas: HTMLCanvasElement, kit: Kit, number: number, training: boolean, skinIndex = 0, role: 'player' | 'official' = 'player') {
-  canvas.width = SPRITE_SIZE.width * SPRITE_SIZE.frames; canvas.height = SPRITE_SIZE.height * SPRITE_SIZE.directions;
+export function paintPixelPlayers(canvas: HTMLCanvasElement, kit: Kit, number: number, training: boolean, skinIndex = 0, role: 'player' | 'official' | 'coach' = 'player', seatedOnly=false) {
+  canvas.width = SPRITE_SIZE.width * (seatedOnly?1:SPRITE_SIZE.frames); canvas.height = SPRITE_SIZE.height * SPRITE_SIZE.directions;
   const c = canvas.getContext('2d')!; c.imageSmoothingEnabled = false;
   const skin = ['#c58b61', '#925b3e', '#e1ad80'][skinIndex % 3]!, skinShadow = ['#986542', '#70422d', '#ba8059'][skinIndex % 3]!;
   for (let direction = 0; direction < 4; direction++) for (let frame = 0; frame < SPRITE_SIZE.frames; frame++) {
-    c.save(); c.translate(frame * SPRITE_SIZE.width + 8, direction * SPRITE_SIZE.height + 8);
+    if(seatedOnly&&frame!==62)continue;
+    c.save(); c.translate((seatedOnly?0:frame) * SPRITE_SIZE.width + 8, direction * SPRITE_SIZE.height + 8);
     if (direction === 3) { c.translate(48, 0); c.scale(-1, 1); }
     const pose = poseAt(frame), action = pose.action;
     const side = direction >= 2, back = direction === 1;
     const jump = action === 'header' ? Math.sin(pose.progress * Math.PI) * 8 : action === 'celebrate' ? Math.sin(pose.progress * Math.PI * 2) * 2 : 0;
     const rotation = action === 'bicycle' ? Math.sin(pose.progress * Math.PI) * 1.8 : action === 'injury' ? pose.progress * 1.5 : action === 'volley' ? Math.sin(pose.progress * Math.PI) * -.22 : 0;
     c.translate(24, 32 - jump + (action === 'injury' ? pose.progress * 24 : 0)); c.rotate(rotation); c.translate(-24, -32);
-    const stride = frame >= 54 ? [0,-2,-4,-2,0,2,4,2][(frame-54)%8]! : frame >= 1 && frame <= 4 ? [0, -3, 0, 3][frame - 1]! : 0;
-    const bob = frame >= 54 ? [0,-1,-2,-1,0,-1,-2,-1][(frame-54)%8]! : frame === 2 || frame === 4 ? -1 : 0;
+    const stride = role==='coach'?0:frame >= 54 ? [0,-2,-4,-2,0,2,4,2][(frame-54)%8]! : frame >= 1 && frame <= 4 ? [0, -3, 0, 3][frame - 1]! : 0;
+    const bob = role==='coach'?0:frame >= 54 ? [0,-1,-2,-1,0,-1,-2,-1][(frame-54)%8]! : frame === 2 || frame === 4 ? -1 : 0;
     const rect = (x: number, y: number, w: number, h: number, color: string) => { c.fillStyle = color; c.fillRect(x, y + bob, w, h); };
     // Far limbs are shaded; bent knees and alternating boots form an eight-frame run cycle.
     const leg = (x: number, offset: number, far: boolean) => {
+      if(action==='seated'){rect(x,40,side?10:6,5,far?skinShadow:skin);rect(x+(side?7:2),44,4,20,skin);rect(x+(side?7:2),55,4,9,kit.socks);rect(x+(side?7:1),64,7,3,'#102133');return;}
       if (action === 'volley' && !far && pose.step > 0 && pose.step < 3) { rect(x, 39, 4, 6, skin); rect(x + 3, 38, 9, 4, skin); rect(x + 11, 38, 6, 4, kit.socks); rect(x + 16, 38, 4, 6, '#102133'); return; }
       const knee = !far && (frame === 6 || action === 'volley') ? -7 : action === 'bicycle' ? (far ? 9 : -9) : action === 'injury' ? (far ? -3 : -6) : frame === 5 && !far ? 5 : offset;
       const ankleX = x + 2 + knee, ankleY = 58 + Math.min(0, knee), kneeX = x + 2 + Math.round(knee * .4), kneeY = 48 - Math.round(Math.abs(knee) * .4);
@@ -74,8 +77,8 @@ export function paintPixelPlayers(canvas: HTMLCanvasElement, kit: Kit, number: n
         const steps = Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1), 1);
         for (let i = 0; i <= steps; i++) rect(Math.round(x1 + (x2 - x1) * i / steps) - 2, Math.round(y1 + (y2 - y1) * i / steps), 4, 2, color);
       };
-      segment(x + 2, 40, kneeX, kneeY, far ? skinShadow : skin);
-      segment(kneeX, kneeY, ankleX, ankleY, skin);
+      segment(x + 2, 40, kneeX, kneeY, role==='coach'?kit.shorts:far ? skinShadow : skin);
+      segment(kneeX, kneeY, ankleX, ankleY, role==='coach'?kit.shorts:skin);
       segment(Math.round(kneeX * .4 + ankleX * .6), Math.round(kneeY * .4 + ankleY * .6), ankleX, ankleY, kit.socks);
       rect(ankleX - 3, ankleY, side ? 8 : 6, 3, '#102133'); rect(ankleX - 2, ankleY, 4, 1, kit.secondary);
     };
@@ -83,7 +86,7 @@ export function paintPixelPlayers(canvas: HTMLCanvasElement, kit: Kit, number: n
     const arm = (x: number, offset: number, far: boolean) => {
       const lifted = frame === 7 || action === 'celebrate' || ((action.endsWith('-card') || action === 'offside' || action === 'assistant-flag') && pose.step > 0 && !far);
       rect(x, lifted ? 17 : 23, 4, 7, training ? '#edf0e8' : kit.shirt);
-      rect(x, lifted ? 13 : 29 + Math.min(0, offset), 3, lifted ? 7 : 7 + Math.abs(offset), far ? skinShadow : skin);
+      rect(x, lifted ? 13 : 29 + Math.min(0, offset), 3, lifted ? 7 : 7 + Math.abs(offset), role==='coach'&&kit.name!=='Polo'?kit.shirt:far ? skinShadow : skin);
       rect(x + (side ? 2 : 0), lifted ? 10 : 35 + offset, 3, 3, skin);
       rect(x, lifted ? 22 : 28, 4, 1, kit.secondary);
     };
@@ -106,6 +109,11 @@ export function paintPixelPlayers(canvas: HTMLCanvasElement, kit: Kit, number: n
     else if (role === 'player' && !side && !back) { rect(28, 25, 2, 3, kit.secondary); rect(28, 25, 1, 1, kit.ink); }
     if (action === 'goal-check' && pose.step > 0) { rect(31, 23, 7, 3, kit.shirt); rect(37, 23, 7, 3, skin); }
     else arm(side ? 27 : 31, -stride, false);
+    if(role==='coach'){
+      if(!back){rect(24,23,1,14,kit.secondary);rect(20,26,3,3,kit.ink);rect(21,26,1,2,kit.secondary);}
+      rect(32,31,8,11,'#d6c9a0');rect(33,33,6,7,'#f3edda');rect(34,32,4,1,'#52606a');
+      if(frame===2){rect(31,24,10,3,kit.shirt);rect(40,22,5,3,skin);}
+    }
     rect(side ? 23 : 22, 17, 5, 5, skinShadow); rect(side ? 23 : 21, 20, 6, 1, kit.secondary);
     // Smaller head and restrained facial pixels keep the silhouette athletic at match scale.
     c.save(); if (action === 'header') c.translate(Math.round(Math.sin(pose.progress * Math.PI) * 3), 0);
@@ -114,6 +122,12 @@ export function paintPixelPlayers(canvas: HTMLCanvasElement, kit: Kit, number: n
     if (back) { rect(20, 9, 9, 7, '#252724'); rect(21, 16, 7, 1, skinShadow); }
     else if (side) { rect(29, 12, 2, 3, skin); rect(27, 11, 1, 1, '#1e252a'); rect(27, 16, 2, 1, skinShadow); }
     else { rect(21, 12, 1, 1, '#17222b'); rect(27, 12, 1, 1, '#17222b'); rect(24, 13, 1, 2, skinShadow); rect(23, 16, 3, 1, skinShadow); }
+    if(role==='coach'){
+      const hair=['#34312e','#777b79','#49372d','#20252b'][Math.floor(skinIndex/3)%4]!;
+      rect(20,8,9,2,skinIndex%4===0?skin:hair);
+      if(back)rect(20,10,9,5,skinIndex%4===0?skin:hair);
+      if(!back&&skinIndex%3===0){rect(20,11,4,2,'#202932');rect(26,11,4,2,'#202932');rect(24,11,2,1,'#202932');}
+    }
     c.restore();
     if (action.endsWith('-card') && pose.step > 0) { rect(side ? 29 : 32, 5, 5, 7, '#18222c'); rect(side ? 30 : 33, 6, 3, 5, action === 'red-card' ? '#f34043' : '#ffdd40'); }
     if (action === 'assistant-flag' && pose.step > 0) { rect(34, 1, 1, 15, '#dce4db'); rect(35, 1, 7, 6, '#ffd744'); rect(35, 1, 3, 3, '#f58c36'); rect(38, 4, 4, 3, '#f58c36'); }

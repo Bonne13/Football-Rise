@@ -113,3 +113,6 @@ Três circuitos distintos, portões físicos numerados, ritmo analógico e acele
 - Navegação sem recarregar o documento, preservação de formulários, mira proporcional à força e curva corrigida.
 - Recepção cronometrada com três trajetórias, repetição apenas de erros em treinos, goleiros reativos e faltas com prévia parcial.
 - Corrida analógica com velocidade limitada por atributos, transição física entre faixas e oito poses de corrida.
+
+### Revisão de recrutamento inicial, treino e banco
+A escolha inicial manual foi substituída por recrutamento automático após a avaliação, conforme desempenho e requisitos da base, preservando contratos de saves existentes. Acertos avançam os exercícios após a apresentação da nota; erros mantêm repetição opcional. O corte de partida recebe nota ao vivo, entrada pelo banco, minutos efetivos e substituição por desgaste/desempenho/plano. Bancos variam pelo estádio, reservas têm pose sentada e treinador usa roupa casual/esportiva neutra com pequena marca do clube. Arbitragem e VAR ficam restritos às partidas. Formato, limites e testes: `docs/GAMEPLAY-FLOW.md`.

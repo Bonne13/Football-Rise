@@ -8,6 +8,15 @@ export function moveReceiver(r: ReceiverState, target: Point, ball: Point, elaps
   r.position.x+=r.velocity.x*dt;r.position.y+=r.velocity.y*dt;
   r.stretching=Math.hypot(ball.x-r.position.x,ball.y-r.position.y)<100;
 }
+/** A supporting player may meet the route, even when the pass was aimed at another teammate. */
+export function receiverRouteTarget(position: Point, route: Point[]): Point | null {
+  let nearest: Point | null = null, gap = 180;
+  for (const point of route) {
+    const d = Math.hypot(position.x - point.x, position.y - point.y);
+    if (d < gap) { nearest = point; gap = d; }
+  }
+  return nearest;
+}
 /** First swept contact, including fast passes that cross a player's reach between frames. */
 export function segmentContact(from: Point, to: Point, center: Point, radius: number): number | null {
   const x=from.x-center.x,y=from.y-center.y,dx=to.x-from.x,dy=to.y-from.y,a=dx*dx+dy*dy,c=x*x+y*y-radius*radius;

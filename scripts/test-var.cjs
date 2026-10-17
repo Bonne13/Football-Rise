@@ -50,8 +50,9 @@ const server = createServer(async (req, res) => {
       });
     });
     for(const result of textureCheck){assert.equal(result.officialIndependent,true);assert.equal(result.playersNumbered,true);}
-    await setup('vision'); await kick(18.46,90.55);
+    await setup('vision','match'); await kick(18.46,90.55);
     assert.match(await page.locator('#field-feedback').innerText(),/Impedimento/);
+    assert.equal(await page.locator('#var-overlay').isVisible(),true);await page.locator('#var-close').click();
     const time = await page.locator('#field-clock').innerText();
     await page.locator('#field-pause').click(); await page.locator('#field-var').click(); await page.clock.runFor(250); await page.locator('#var-pause').click();
     assert.equal(await page.locator('.field-stage').getAttribute('data-var-phase'),'assistant');

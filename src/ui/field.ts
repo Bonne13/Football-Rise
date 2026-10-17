@@ -7,8 +7,10 @@ import { paintPixelPlayers, spriteFrame, SPRITE_SIZE, PLAYER_ANIMATIONS, type Pl
 import { reviewIncident, reviewFrame, reviewVerdict, REVIEW_STAGES, type ReviewIncident } from '../domain/match/video-review.js';
 import { VARroom } from './var-room.js';
 import { Field3D, type FieldAppearance } from './field3d.js';
+import { playerMatchRating, updateParticipation } from '../domain/match/participation.js';
+import { coachFor } from '../data/coaches.js';
 import { receivingPlayers, missReception, trialZone, createTrial, strikeVelocity, controlTrial, tickTrial, ballPath, keeperAt, teammateAt, type Point, type Trial } from '../domain/gameplay/trial.js';
-import { canRetryTrial, recordTrial, sessionAverage, type DrillSession } from '../application/drills.js';
+import { canRetryTrial, recordTrial, sessionAverage, sessionFinished, type DrillSession } from '../application/drills.js';
 export const DRILL_NAMES = { shoot: 'Finalização', vision: 'Visão de jogo', pass: 'Passe', speed: 'Velocidade', technique: 'Condução e drible', freekick: 'Falta' };
 const hints = { shoot: 'Puxe no campo para mirar e dosar a força. Depois, toque na bola ampliada para escolher a curva e chutar.', vision: 'Passe para um companheiro livre. A linha laranja marca o impedimento. Puxe na direção oposta ao passe.', pass: 'Antecipe o companheiro azul em movimento. Puxe e solte, evitando os defensores vermelhos.', speed: 'Arraste: quanto mais longe, mais rápido. Desloque para os lados para trocar de faixa; solte para frear. WASD ou setas no computador.', technique: 'Arraste no gramado como um direcional para conduzir; solte para frear. Um toque manda correr até o ponto. Atravesse os portões em ordem com a bola.', freekick: 'Puxe no campo para definir mira e força. Depois toque na bola para escolher a curva e chutar.' };
 interface Options { fixtureLabel: string; appearance: FieldAppearance; attributes: Attributes; session: DrillSession; onProgress: (session: DrillSession) => void; onComplete: (session: DrillSession) => void | Promise<void>; onExit: () => void }
@@ -33,6 +35,7 @@ export function mountField(host: HTMLElement, options: Options): () => void {
   const movementKeys = new Set<string>();
   let paused = false, presentationTime = 0, recorded = false;
   let muted = false;
+  let successTime=0,transitioning=false;
   try { muted = localStorage.getItem('football-rise.sound-muted') === 'true'; } catch {}
   let audio: AudioContext | null = null;
   let crowdSource: AudioBufferSourceNode | null = null;
@@ -58,7 +61,7 @@ export function mountField(host: HTMLElement, options: Options): () => void {
     } catch {}
   }
   document.body.classList.add('field-screen');
-  host.innerHTML = `<section class="field-stage"><div class="field-heading"><div><small class="stadium-caption" id="stadium-caption"></small><span class="eyebrow">${session.mode === 'assessment' ? 'ACADEMIA / AVALIAÇÃO' : session.mode === 'match' ? 'DIA DE JOGO' : 'CENTRO DE TREINAMENTO'}</span><h2 id="drill-name"></h2><small class="fixture-caption" id="fixture-caption"></small></div><strong id="drill-counter"></strong></div><nav class="shot-steps" aria-label="Etapas do chute"><span data-step="aiming"><b>01</b> Mire</span><span data-step="preparing"><b>02</b> Prepare</span><span data-step="flight"><b>03</b> Finalize</span></nav><button type="button" id="field-return" hidden>Voltar ao exercício</button><p id="stadium-mode-note" hidden>Visão panorâmica · exercício pausado</p><button type="button" id="player-turn" hidden>Ver costas</button><label id="player-animation-control" hidden>Animações · demonstração<select id="player-animation"><option value="">Postura atual</option>${Object.entries(PLAYER_ANIMATIONS).map(([id, a]) => `<option value="${id}">${a.label}</option>`).join('')}</select></label><div class="field-wrap"><canvas id="football-field" width="880" height="1320" tabindex="0" aria-label="Campo de futebol interativo"></canvas><div class="field-coach"><span class="live-dot"></span><div><strong id="coach-title">Escolha seu canto.</strong><span id="drill-hint"></span><span id="crowd-status" aria-live="polite"></span></div></div><button type="button" id="dribble-sprint" class="dribble-pace" aria-pressed="false" hidden>Segure para acelerar<small>Shift no computador</small></button><div id="pull-origin" hidden aria-hidden="true"></div><div id="pull-vector" hidden aria-hidden="true"></div><div id="contact-dock" hidden><small>ESCOLHA A CURVA</small><canvas id="contact-ball" width="200" height="200" aria-label="Visão ampliada da bola: toque para escolher a curva e chutar"></canvas></div><div class="field-live"><span id="field-zone"></span><span id="field-clock"></span><span id="field-score"></span><span id="referee-decision"></span></div><button type="button" id="aim-reset" hidden>Refazer mira</button></div><section id="ball-control" class="ball-control" hidden><div><span>PUXE A MIRA PARA DOSAR A FORÇA</span><div class="power-track"><progress id="shot-power" value="0" max="100"></progress><output id="shot-power-value">0%</output></div></div></section><p id="field-feedback" role="status" aria-live="polite"></p><details id="shot-effects" hidden><summary>Ajuste fino de efeito e elevação</summary><div class="fields"><label>Efeito lateral<input id="field-curve" type="range" min="-1" max="1" step="0.05" value="0"></label><label>Elevação<input id="field-lift" type="range" min="0" max="1" step="0.05" value="0"></label></div></details><div class="actions" id="lane-buttons" hidden><button type="button" id="lane-left">← Esquerda</button><button type="button" id="lane-right">Direita →</button></div><div class="field-actions"><button type="button" id="field-pause" aria-label="Pausar">Pausar</button><button type="button" id="field-retry" hidden>Tentar novamente</button><button type="button" id="field-next" class="primary" hidden>Próxima tentativa →</button></div><dialog id="pause-menu" aria-labelledby="pause-title"><span class="eyebrow">FOOTBALL RISE</span><h2 id="pause-title">Jogo pausado</h2><p>A ação fica parada enquanto você estiver aqui.</p><button id="field-resume" class="primary">Continuar jogando</button><button id="field-goal-review" type="button" hidden>Rever bola e linha do gol</button><button id="field-var" type="button" hidden>Rever lance com VAR</button><button id="field-player" type="button">Ver jogador</button><button id="field-stadium" type="button">Conhecer o estádio</button><button id="field-sound" type="button"></button><label class="graphics-setting">Uniforme da arbitragem<select id="officials-kit"><option value="auto">Automático · contraste</option><option value="black">Preto</option><option value="yellow">Amarelo</option><option value="red">Vermelho</option></select></label><label class="graphics-setting">Qualidade gráfica<select id="field-quality"><option value="auto">Automática</option><option value="high">Alta · computador</option><option value="low">Leve · mais desempenho</option></select></label><button id="field-exit" type="button">Salvar e voltar à carreira</button><p class="hint" id="pause-status">As tentativas concluídas são guardadas. Uma ação em andamento recomeça ao voltar.</p></dialog><section id="var-overlay" hidden aria-label="Revisão do VAR"><div class="var-banner"><span>FOOTBALL RISE · REVISÃO</span><h2 id="var-title"></h2><p id="var-detail"></p></div><canvas id="var-room" aria-label="Sala do VAR com três integrantes e seis telas"></canvas><input id="var-progress" type="range" min="0" max="16.79" step="0.01" value="0" aria-label="Progresso da revisão"><div class="var-controls"><button id="var-pause" type="button">Pausar revisão</button><button id="var-next-scene" type="button">Próxima cena</button><button id="var-close" type="button">Voltar ao jogo</button></div><small class="var-protocol">Sequência cinematográfica simplificada · análise baseada no lance</small></section><p id="renderer-status" class="hint"></p></section>`;
+  host.innerHTML = `<section class="field-stage"><div class="field-heading"><div><small class="stadium-caption" id="stadium-caption"></small><span class="eyebrow">${session.mode === 'assessment' ? 'ACADEMIA / AVALIAÇÃO' : session.mode === 'match' ? 'DIA DE JOGO' : 'CENTRO DE TREINAMENTO'}</span><h2 id="drill-name"></h2><small class="fixture-caption" id="fixture-caption"></small></div><strong id="drill-counter"></strong></div><nav class="shot-steps" aria-label="Etapas do chute"><span data-step="aiming"><b>01</b> Mire</span><span data-step="preparing"><b>02</b> Prepare</span><span data-step="flight"><b>03</b> Finalize</span></nav><button type="button" id="field-return" hidden>Voltar ao exercício</button><p id="stadium-mode-note" hidden>Visão panorâmica · exercício pausado</p><button type="button" id="player-turn" hidden>Ver costas</button><label id="player-animation-control" hidden>Animações · demonstração<select id="player-animation"><option value="">Postura atual</option>${Object.entries(PLAYER_ANIMATIONS).map(([id, a]) => `<option value="${id}">${a.label}</option>`).join('')}</select></label><div class="field-wrap"><canvas id="football-field" width="880" height="1320" tabindex="0" aria-label="Campo de futebol interativo"></canvas><div class="field-coach"><span class="live-dot"></span><div><strong id="coach-title">Escolha seu canto.</strong><span id="drill-hint"></span><span id="crowd-status" aria-live="polite"></span></div></div><button type="button" id="dribble-sprint" class="dribble-pace" aria-pressed="false" hidden>Segure para acelerar<small>Shift no computador</small></button><div id="pull-origin" hidden aria-hidden="true"></div><div id="pull-vector" hidden aria-hidden="true"></div><div id="contact-dock" hidden><small>ESCOLHA A CURVA</small><canvas id="contact-ball" width="200" height="200" aria-label="Visão ampliada da bola: toque para escolher a curva e chutar"></canvas></div><div class="field-live"><span id="field-zone"></span><span id="field-clock"></span><span id="field-score"></span><span id="match-rating" hidden></span><span id="match-minute" hidden></span><span id="referee-decision"></span></div><button type="button" id="aim-reset" hidden>Refazer mira</button></div><section id="ball-control" class="ball-control" hidden><div><span>PUXE A MIRA PARA DOSAR A FORÇA</span><div class="power-track"><progress id="shot-power" value="0" max="100"></progress><output id="shot-power-value">0%</output></div></div></section><section id="match-entry" hidden><span class="eyebrow">CHAMADA DO TREINADOR</span><h2 id="match-entry-title"></h2><p>Você começa no banco. Aqueça e entre para disputar suas oportunidades.</p><button id="match-enter" class="primary" type="button">Entrar em campo →</button></section><p id="field-feedback" role="status" aria-live="polite"></p><details id="shot-effects" hidden><summary>Ajuste fino de efeito e elevação</summary><div class="fields"><label>Efeito lateral<input id="field-curve" type="range" min="-1" max="1" step="0.05" value="0"></label><label>Elevação<input id="field-lift" type="range" min="0" max="1" step="0.05" value="0"></label></div></details><div class="actions" id="lane-buttons" hidden><button type="button" id="lane-left">← Esquerda</button><button type="button" id="lane-right">Direita →</button></div><div class="field-actions"><button type="button" id="field-pause" aria-label="Pausar">Pausar</button><button type="button" id="field-retry" hidden>Tentar novamente</button><button type="button" id="field-next" class="primary" hidden>Próxima tentativa →</button></div><dialog id="pause-menu" aria-labelledby="pause-title"><span class="eyebrow">FOOTBALL RISE</span><h2 id="pause-title">Jogo pausado</h2><p>A ação fica parada enquanto você estiver aqui.</p><button id="field-resume" class="primary">Continuar jogando</button><button id="field-goal-review" type="button" hidden>Rever bola e linha do gol</button><button id="field-var" type="button" hidden>Rever lance com VAR</button><button id="field-player" type="button">Ver jogador</button><button id="field-bench" type="button">Ver banco e comissão técnica</button><button id="field-stadium" type="button">Conhecer o estádio</button><button id="field-sound" type="button"></button><label class="graphics-setting">Uniforme da arbitragem<select id="officials-kit"><option value="auto">Automático · contraste</option><option value="black">Preto</option><option value="yellow">Amarelo</option><option value="red">Vermelho</option></select></label><label class="graphics-setting">Qualidade gráfica<select id="field-quality"><option value="auto">Automática</option><option value="high">Alta · computador</option><option value="low">Leve · mais desempenho</option></select></label><button id="field-exit" type="button">Salvar e voltar à carreira</button><p class="hint" id="pause-status">As tentativas concluídas são guardadas. Uma ação em andamento recomeça ao voltar.</p></dialog><section id="var-overlay" hidden aria-label="Revisão do VAR"><div class="var-banner"><span>FOOTBALL RISE · REVISÃO</span><h2 id="var-title"></h2><p id="var-detail"></p></div><canvas id="var-room" aria-label="Sala do VAR com três integrantes e seis telas"></canvas><input id="var-progress" type="range" min="0" max="16.79" step="0.01" value="0" aria-label="Progresso da revisão"><div class="var-controls"><button id="var-pause" type="button">Pausar revisão</button><button id="var-next-scene" type="button">Próxima cena</button><button id="var-close" type="button">Voltar ao jogo</button></div><small class="var-protocol">Sequência cinematográfica simplificada · análise baseada no lance</small></section><p id="renderer-status" class="hint"></p></section>`;
   const $ = <T extends HTMLElement>(id: string) => host.querySelector<T>('#' + id)!;
   $('fixture-caption').textContent = options.fixtureLabel;
   $('stadium-caption').textContent = `${options.appearance.stadium.name} · ${options.appearance.stadium.city} · ${options.appearance.stadium.country} (${options.appearance.stadium.reference === 'historical' ? 'recriação aproximada' : 'cenário simulado'})`;
@@ -78,6 +81,11 @@ export function mountField(host: HTMLElement, options: Options): () => void {
   quality.disabled = !view3d; view3d?.setQuality(quality.value as 'auto' | 'high' | 'low');
   quality.onchange = () => { view3d?.setQuality(quality.value as 'auto' | 'high' | 'low'); try { localStorage.setItem('football-rise.graphics.v1', quality.value); } catch {} draw(); };
   const officials = $<HTMLSelectElement>('officials-kit');
+  officials.closest('label')!.hidden=session.mode!=='match';
+  if(session.mode!=='match')for(const option of Array.from($<HTMLSelectElement>('player-animation').options)){if(/Árbitro|Bandeirinha/.test(option.text))option.remove();}
+  const coach=options.appearance.coach??coachFor(undefined,options.appearance.kit);
+  const coachCaption=document.createElement('span');coachCaption.textContent=coach.label;coachCaption.title=coach.source;
+  host.querySelector('.field-coach>div')!.append(coachCaption);
   try { const saved = localStorage.getItem('football-rise.officials-kit'); if (saved && ['auto', 'black', 'yellow', 'red'].includes(saved)) officials.value = saved; } catch {}
   view3d?.setOfficialsKit(officials.value as OfficialsChoice);
   officials.onchange = () => { view3d?.setOfficialsKit(officials.value as OfficialsChoice); try { localStorage.setItem('football-rise.officials-kit', officials.value); } catch {} draw(); };
@@ -88,12 +96,19 @@ export function mountField(host: HTMLElement, options: Options): () => void {
   const contact2d = view3d ? null : contactCanvas.getContext('2d');
   const curve = $<HTMLInputElement>('field-curve'), lift = $<HTMLInputElement>('field-lift');
   function setup() {
+    successTime=0;
     $('field-retry').hidden = true; recorded = false; delete feedback.dataset.outcome; $('dribble-sprint').hidden=true;$('dribble-sprint').setAttribute('aria-pressed','false');
     contactCanvas.style.transform = ''; reception = null; drag = null; contactDrag = null; aim = null; phase = 'aiming'; power = 0; confirmed = false; selectedAim = { x: 440, y: 65 }; curve.value = '0'; lift.value = '0'; view3d?.setContact(0, 0); last = 0;
-    if (session.results.length === session.sequence.length) {
+    if (sessionFinished(session)) {
+      if(view3d){
+        const substituted=session.mode==='match'&&session.participation?.exitMinute!==null&&session.participation?.exitMinute!==undefined;
+        const preview=trial??createTrial(session.results.at(-1)?.kind??'shoot',Math.max(1,session.results.length),session.seed,100,options.attributes,session.mode==='match'?'match':'training');
+        preview.resolved=true;view3d.setOnBench(substituted);view3d.setBenchView(substituted);view3d.render(preview,null,0,0,'resolved',presentationTime);
+      }
       trial = null; phase = 'resolved'; $('aim-reset').hidden = true; (host.querySelector('.shot-steps') as HTMLElement).hidden = true; $('coach-title').textContent = 'Sessão concluída.'; $('drill-name').textContent = 'Sessão concluída'; $('drill-counter').textContent = `${Math.round(sessionAverage(session))}/100`;
-      $('drill-hint').textContent = 'As notas foram calculadas pelas suas jogadas.';
-      feedback.textContent = session.sequence.filter((v, i, a) => a.indexOf(v) === i).map(kind => `${DRILL_NAMES[kind]}: ${Math.round(sessionAverage(session, kind))}/100`).join(' · ');
+      $('drill-hint').textContent = session.mode==='match'?`Nota da partida: ${playerMatchRating(session.results).toFixed(1)} · ${session.participation?((session.participation.exitMinute??session.participation.minute)-session.participation.entryMinute)+' minutos jogados':'oportunidades concluídas'}`:'As notas foram calculadas pelas suas jogadas.';
+      feedback.textContent = session.mode==='match'&&session.participation?.reason?`Substituído aos ${session.participation.exitMinute}′ · ${session.participation.reason==='fatigue'?'desgaste físico':session.participation.reason==='performance'?'decisão técnica pelo desempenho':'minutagem planejada'}. `:'';
+      feedback.textContent += session.results.map(r=>r.kind).filter((v, i, a) => a.indexOf(v) === i).map(kind => `${DRILL_NAMES[kind]}: ${Math.round(sessionAverage(session, kind))}/100`).join(' · ');
       next.hidden = false; next.textContent = session.mode === 'assessment' ? 'Concluir avaliação →' : session.mode === 'match' ? 'Concluir partida →' : 'Aplicar treino →';
       $('shot-effects').hidden = true; $('ball-control').hidden = true; $('contact-dock').hidden = true; $('lane-buttons').hidden = true; draw(); return;
     }
@@ -133,7 +148,7 @@ export function mountField(host: HTMLElement, options: Options): () => void {
   }
   function lane(direction: -1 | 1) { if (trial) controlTrial(trial, { type: 'lane', direction }); }
   canvas.onpointerdown = event => {
-    if (overview || paused || !trial || trial.resolved || trial.shot || drag || dribbleDrag || contactDrag || event.isPrimary === false || event.button !== 0) return;
+    if (overview || paused || !trial || trial.resolved || trial.shot || session.participation&&!session.participation.entered || drag || dribbleDrag || contactDrag || event.isPrimary === false || event.button !== 0) return;
     event.preventDefault(); canvas.focus({ preventScroll: true });
     if (trial.kind === 'technique' || trial.kind === 'speed') { dribbleDrag = { id: event.pointerId, x: event.clientX, y: event.clientY, active: false }; pullTip = { x: event.clientX, y: event.clientY }; canvas.setPointerCapture(event.pointerId); return; }
     if (confirmed) return;
@@ -185,7 +200,7 @@ export function mountField(host: HTMLElement, options: Options): () => void {
   $('aim-reset').onclick = () => { reception = null; cancel(); confirmed = false; power = 0; phase = 'aiming'; aim = null; curve.value = lift.value = '0'; view3d?.setContact(0, 0); updatePhase(); feedback.textContent = 'Escolha um novo destino. A bola aparece depois da mira.'; };
   canvas.onkeydown = event => {
     if (event.key === 'Escape') { event.preventDefault(); setPaused(!paused); return; }
-    if (overview || paused || !trial || trial.resolved || trial.shot) return;
+    if (overview || paused || !trial || trial.resolved || trial.shot || session.participation&&!session.participation.entered) return;
 
     if(event.key==='Shift'&&trial.kind==='technique'){event.preventDefault();controlTrial(trial,{type:'sprint',active:true});$('dribble-sprint').setAttribute('aria-pressed','true');return;}
     const direction: Record<string, Point> = { ArrowLeft: { x: -35, y: 0 }, ArrowRight: { x: 35, y: 0 }, ArrowUp: { x: 0, y: -35 }, ArrowDown: { x: 0, y: 35 } };
@@ -242,15 +257,15 @@ export function mountField(host: HTMLElement, options: Options): () => void {
     if (disposed || paused === value) return;
     paused = value; if (paused) stopCrowdSound(); cancel(); last = 0;
     host.querySelector('.field-stage')!.setAttribute('data-paused', String(paused));
-    $('field-var').hidden = !trial || !reviewIncident(trial);
+    $('field-var').hidden = session.mode!=='match' || !trial || !reviewIncident(trial);
     $('field-goal-review').hidden = !view3d || !trial?.resolved || !trial.shot || !['shoot', 'freekick'].includes(trial.kind);
     if (paused) { void audio?.suspend(); pauseMenu.showModal(); $('field-sound').textContent = muted ? 'Som: desligado' : 'Som: ligado'; }
     else { pauseMenu.close(); if (!muted) void audio?.resume(); canvas.focus({ preventScroll: true }); }
   }
   $('field-pause').onclick = () => setPaused(true);
-  $('field-stadium').hidden = $('field-player').hidden = !view3d;
+  $('field-bench').hidden = $('field-stadium').hidden = $('field-player').hidden = !view3d;
   function setOverview(value: boolean, portrait = false) {
-    cancel(); overview = value; view3d?.setOverview(value && !portrait); view3d?.setPortrait(value && portrait); view3d?.setGoalReview(false); view3d?.setVARView(null); portraitBack = false; view3d?.setPortraitBack(false); $('player-turn').hidden = !value || !portrait; $('player-turn').textContent = 'Ver costas'; $('player-animation-control').hidden = !value || !portrait; $<HTMLSelectElement>('player-animation').value = ''; view3d?.setAnimationPreview(null);
+    cancel(); overview = value; view3d?.setBenchView(false); view3d?.setOverview(value && !portrait); view3d?.setPortrait(value && portrait); view3d?.setGoalReview(false); view3d?.setVARView(null); portraitBack = false; view3d?.setPortraitBack(false); $('player-turn').hidden = !value || !portrait; $('player-turn').textContent = 'Ver costas'; $('player-animation-control').hidden = !value || !portrait; $<HTMLSelectElement>('player-animation').value = ''; view3d?.setAnimationPreview(null);
     $('stadium-mode-note').textContent = portrait ? 'Inspeção do atleta · exercício pausado' : 'Visão panorâmica · exercício pausado';
     host.querySelector('.field-stage')!.setAttribute('data-view', value ? 'stadium' : 'player');
     $('field-return').hidden = $('stadium-mode-note').hidden = !value;
@@ -281,7 +296,7 @@ export function mountField(host: HTMLElement, options: Options): () => void {
     host.querySelector('.field-stage')!.setAttribute('data-view', 'var'); $('var-overlay').hidden = false;
     showReview(); draw();
   }
-  $('field-var').onclick = () => { if (!trial) return; const incident = reviewIncident(trial); if (incident) startReview(incident); };
+  $('field-var').onclick = () => { if (session.mode!=='match' || !trial) return; const incident = reviewIncident(trial); if (incident) startReview(incident); };
   $('var-close').onclick = closeReview;
   $('var-progress').oninput = () => { if (review) { review.elapsed = Math.max(0, Math.min(16.79, Number($<HTMLInputElement>('var-progress').value))); showReview(); draw(); } };
   $('var-pause').onclick = () => { if (review) { review.paused = !review.paused; showReview(); } };
@@ -296,6 +311,7 @@ export function mountField(host: HTMLElement, options: Options): () => void {
   $('player-turn').onclick = () => { portraitBack = !portraitBack; view3d?.setPortraitBack(portraitBack); $('player-turn').textContent = portraitBack ? 'Ver frente' : 'Ver costas'; draw(); };
   $('field-goal-review').onclick = () => { if (!trial?.shot) return; setPaused(false); setOverview(true); view3d?.setGoalReview(true); $('stadium-mode-note').textContent = trial.shot.decision === 'goal' ? 'Gol confirmado · bola inteira além da linha' : 'Sem gol · confira a posição da bola e da linha'; draw(); };
   $('field-player').onclick = () => { setPaused(false); setOverview(true, true); };
+  $('field-bench').onclick = () => {setPaused(false);setOverview(true);view3d?.setBenchView(true);$('stadium-mode-note').textContent='Banco de reservas e comissão técnica · exercício pausado';draw();};
   $('field-stadium').onclick = () => { setPaused(false); setOverview(true); };
   $('field-return').onclick = () => setOverview(false);
   $('field-resume').onclick = () => setPaused(false);
@@ -303,29 +319,32 @@ export function mountField(host: HTMLElement, options: Options): () => void {
   $('field-sound').onclick = () => { muted = !muted; if (muted) stopCrowdSound(); try { localStorage.setItem('football-rise.sound-muted', String(muted)); } catch {} $('field-sound').textContent = muted ? 'Som: desligado' : 'Som: ligado'; };
   $('field-exit').onclick = () => { try { saveResolved(); options.onExit(); } catch { $('pause-status').textContent = 'Não foi possível salvar. Continue aqui e tente novamente.'; } };
   $('field-retry').onclick = () => { if (trial && !recorded && canRetryTrial(session.mode, trial)) setup(); };
-  next.onclick = async () => {
+  async function advanceAttempt() {
+    if(transitioning)return;transitioning=true;
     try {
       if (!trial) { await options.onComplete(session); return; }
       saveResolved(); setup();
     } catch (error) { feedback.textContent = error instanceof Error ? error.message : 'Não foi possível salvar. Tente novamente.'; }
-  };
+    finally{transitioning=false;}
+  }
+  next.onclick = advanceAttempt;
   function line(points: Point[], color = '#d5ecd0', width = 3) {
     ctx!.strokeStyle = color; ctx!.lineWidth = width; ctx!.beginPath(); points.forEach((p, i) => { const v = project(p); if (i) ctx!.lineTo(v.x, v.y); else ctx!.moveTo(v.x, v.y); }); ctx!.stroke();
   }
   function disc(p: Point, radius: number, color: string) { const v = project(p), scale = .5 + p.y / 1320 * .5; ctx!.fillStyle = color; ctx!.beginPath(); ctx!.ellipse(v.x, v.y, radius * scale, radius * scale * .7, 0, 0, Math.PI * 2); ctx!.fill(); }
   const pixelSheets = new Map<string, HTMLCanvasElement>();
-  function actor(p: Point, color: string, label = '') {
-    const user = color === options.appearance.kit.shirt;
-    const key = `${color}:${label}`; let sheet = pixelSheets.get(key);
+  function actor(p: Point, color: string, label = '', staff = false) {
+    const user = !staff && color === options.appearance.kit.shirt;
+    const key = `${color}:${label}:${staff}`; let sheet = pixelSheets.get(key);
     if (!sheet) {
       sheet = document.createElement('canvas');
-      paintPixelPlayers(sheet, user ? options.appearance.kit : { ...options.appearance.kit, shirt: color, pattern: 'plain' }, user ? options.appearance.number : Number(label) || 1, options.appearance.training);
+      paintPixelPlayers(sheet, staff?coach.kit:user ? options.appearance.kit : { ...options.appearance.kit, shirt: color, pattern: 'plain' }, user ? options.appearance.number : Number(label) || 1, !staff&&options.appearance.training,staff?coach.appearanceSeed:0,staff?'coach':'player');
       pixelSheets.set(key, sheet);
     }
     const v = project(p), scale = .6 + p.y / 1320 * .4;
-    const receiving = !user && !!trial?.shot?.support && Math.hypot(p.x-trial.shot.support.position.x,p.y-trial.shot.support.position.y)<.01;
-    const moving = receiving && Math.hypot(trial!.shot!.support!.velocity.x,trial!.shot!.support!.velocity.y)>1 || user && !!trial?.started && !trial.resolved && (trial.kind === 'speed' && trial.velocity.y > .15 || trial.kind === 'technique' && Math.hypot(trial.velocity.x, trial.velocity.y) > 4);
-    const frame = receiving && trial!.shot!.support!.stretching ? trial!.shot!.support!.controlled ? 6 : 5 : spriteFrame(trial?.kind==='technique'?trial.travel/450:trial?.kind==='speed'?trial.distance/9:presentationTime, moving, user && trial?.shot ? trial.shot.elapsed : null);
+    const receiving = !user ? trial?.shot?.receivers.find(r=>Math.hypot(p.x-r.position.x,p.y-r.position.y)<.01) : undefined;
+    const moving = !!receiving && Math.hypot(receiving.velocity.x,receiving.velocity.y)>1 || user && !!trial?.started && !trial.resolved && (trial.kind === 'speed' && trial.velocity.y > .15 || trial.kind === 'technique' && Math.hypot(trial.velocity.x, trial.velocity.y) > 4);
+    const frame = receiving?.stretching ? receiving.controlled ? 6 : 5 : spriteFrame(trial?.kind==='technique'?trial.travel/450:trial?.kind==='speed'?trial.distance/9:presentationTime, moving, user && trial?.shot ? trial.shot.elapsed : null);
     disc(p, 16, '#0005'); ctx!.imageSmoothingEnabled = false;
     ctx!.drawImage(sheet, frame * SPRITE_SIZE.width, (user ? 1 : 0) * SPRITE_SIZE.height, SPRITE_SIZE.width, SPRITE_SIZE.height, Math.round(v.x - 48 * scale), Math.round(v.y - 104 * scale), Math.round(96 * scale), Math.round(120 * scale));
   }
@@ -341,11 +360,19 @@ export function mountField(host: HTMLElement, options: Options): () => void {
     }
     $('crowd-status').hidden = !crowd;
     if (crowd) { const status = trial?.resolved ? crowdReaction(crowd, trial.outcome).message : `Público estimado: ${crowd.attendance.toLocaleString('pt-BR')} · ${Math.round(crowd.occupancy * 100)}% · torcida ${crowd.mood}`; if ($('crowd-status').textContent !== status) $('crowd-status').textContent = status; }
+    if(session.mode==='match'){
+      const actions=trial?.resolved&&!recorded?[...session.results,{score:trial.score,outcome:trial.outcome}]:session.results;
+      $('match-rating').hidden=$('match-minute').hidden=false;
+      $('match-rating').textContent=`NOTA ${playerMatchRating(actions).toFixed(1)}`;
+      const p=session.participation?updateParticipation(session.participation,actions,session.sequence.length):null;
+      $('match-minute').textContent=p?`${p.minute}′ · ${p.exitMinute!==null?'substituído':!p.entered?'no banco':'em campo'}`:'';
+      canvas.dataset.participation=p?JSON.stringify({...p,rating:playerMatchRating(actions)}):'';
+    }
     canvas.dataset.receiver = trial?.shot?.support ? JSON.stringify(trial.shot.support) : '';
     canvas.dataset.shot = trial?.shot ? JSON.stringify({ keeper: trial.shot.goalkeeper, curve: trial.shot.curve, startHeight: trial.shot.startHeight ?? .11, position: trial.shot.ball.position }) : '';
     canvas.dataset.speed = trial?.kind === 'speed' ? JSON.stringify({ x: trial.player.x, lane: trial.lane, lateral: trial.velocity.x, forward: trial.velocity.y, demand: trial.runDemand }) : '';
     canvas.dataset.previewReach = String(power);
-    canvas.dataset.dribble=trial?.kind==='technique'?JSON.stringify({context:trial.context,player:trial.player,ball:trial.ball,next:trial.gates[trial.gate]??null,gate:trial.gate,total:trial.gates.length,sprint:trial.sprint,velocity:trial.velocity,defenders:trial.context==='match'?trial.defenders:[],resolved:trial.resolved}):'';
+    canvas.dataset.dribble=trial?.kind==='technique'?JSON.stringify({context:trial.context,player:trial.player,ball:trial.ball,carry:trial.carry,next:trial.gates[trial.gate]??null,gate:trial.gate,total:trial.gates.length,sprint:trial.sprint,velocity:trial.velocity,defenders:trial.context==='match'?trial.defenders:[],resolved:trial.resolved}):'';
     canvas.dataset.origin=trial?JSON.stringify(trial.origin):'';
     canvas.dataset.aim = aim ? JSON.stringify(aim) : '';
     canvas.style.cursor = confirmed ? 'default' : drag ? 'grabbing' : 'grab';
@@ -359,6 +386,7 @@ export function mountField(host: HTMLElement, options: Options): () => void {
     }
     $<HTMLProgressElement>('shot-power').value = power * 100; $('shot-power-value').textContent = `${Math.round(power * 100)}% · ${Math.round(strikeVelocity(options.attributes, trial?.kind ?? 'shoot', power))} km/h`;
     $('referee-decision').textContent = trial?.referee.signal === 'goal' ? 'Árbitro: gol confirmado' : trial?.referee.signal === 'offside' ? 'Árbitro: impedimento' : trial?.referee.signal === 'no-goal' ? 'Árbitro: sem gol' : '';
+    $('referee-decision').hidden=session.mode!=='match';
     if (view3d) { view3d.render(trial, aim, Number(curve.value), Number(lift.value), phase, presentationTime, power, reception ? receptionFrame(reception) : null);
       if (trial) { $('field-clock').textContent = !trial.started ? 'PREPARE SUA JOGADA' : `${trial.time.toFixed(1)} s`; $('field-score').textContent = trial.kind === 'speed' ? `${Math.min(100, Math.floor(trial.distance))} m` : trial.kind === 'technique' ? `${trial.gate}/${trial.gates.length} ${trial.context==='match'?'linhas':'portões'}` : power > 0 ? `POTÊNCIA ${Math.round(power * 100)}%` : 'MIRA + FORÇA → CURVA'; } return; }
     if (contact2d) { contact2d.clearRect(0, 0, 200, 200); const gradient = contact2d.createRadialGradient(75, 60, 5, 100, 100, 80); gradient.addColorStop(0, '#fff'); gradient.addColorStop(1, '#8193a4'); contact2d.fillStyle = gradient; contact2d.beginPath(); contact2d.arc(100, 100, 80, 0, Math.PI * 2); contact2d.fill(); contact2d.fillStyle = '#102338'; for (const [x,y] of [[90,65],[50,120],[140,130]]) { contact2d.beginPath(); for (let k=0;k<5;k++) {const a=k*Math.PI*2/5;const px=x!+Math.cos(a)*19,py=y!+Math.sin(a)*19;if(k)contact2d.lineTo(px,py);else contact2d.moveTo(px,py);}contact2d.fill();} }
@@ -378,6 +406,7 @@ export function mountField(host: HTMLElement, options: Options): () => void {
     }
     if (!trial) { ctx!.fillStyle = '#c7f36b'; ctx!.font = 'bold 44px system-ui'; ctx!.textAlign = 'center'; ctx!.fillText('SESSÃO CONCLUÍDA', 440, 640); return; }
     const t = trial;
+    actor(t.context==='match'?{x:20,y:700}:{x:t.layout===1?790:90,y:850},coach.kit.shirt,'',true);
     if (t.kind === 'speed') {
       for (const x of [293, 587]) line([{ x, y: 0 }, { x, y: 1320 }], '#e3f2d788');
       for (const o of t.obstacles) if (!o.passed && o.distance - t.distance < 55) { const p = { x: [147, 440, 733][o.lane]!, y: 1150 - (o.distance - t.distance) * 20 }; disc(p, 70, '#ef7049'); }
@@ -422,12 +451,28 @@ export function mountField(host: HTMLElement, options: Options): () => void {
     } else if (!reception) { contactCanvas.style.transform = ''; canvas.dataset.reception = ''; $('contact-dock').removeAttribute('data-timing'); }
     if (!overview && !paused && trial && !drag && !contactDrag && !document.hidden) tickTrial(trial, dt);
     if (trial?.resolved) { $('field-retry').hidden = recorded || !canRetryTrial(session.mode, trial); if (phase !== 'resolved') { phase = 'resolved'; crowdSound(trial.outcome); sound(trial.outcome === 'goal' ? 740 : 280); updatePhase(); } feedback.dataset.outcome = trial.outcome ?? ''; feedback.textContent = `${trial.message} Nota: ${trial.score}/100.`; next.hidden = false; next.textContent = session.results.length + 1 === session.sequence.length ? 'Ver resultado →' : 'Próxima tentativa →'; }
+    if(trial?.resolved&&session.mode!=='match'&&!canRetryTrial(session.mode,trial)&&!paused&&!overview&&!document.hidden){
+      successTime+=dt;feedback.textContent+=' Próxima tentativa em instantes…';
+      if(successTime>=1.2)void advanceAttempt();
+    }
     $<HTMLButtonElement>('field-pause').hidden = !!drag || !!contactDrag || phase === 'flight';
     if (!review && trial?.resolved && session.mode === 'match') { const incident = reviewIncident(trial); if (incident && ['goal', 'offside'].includes(trial.outcome ?? '') && !reviewed.has(incident.id)) startReview(incident); }
     if (!paused && !review?.paused) draw(); raf = requestAnimationFrame(frame);
   }
   const suspend = () => { stopCrowdSound(); if (review) { review.paused = true; showReview(); } else setPaused(true); };
   const onVisibility = () => { if (document.hidden) suspend(); }; const onBlur = suspend; document.addEventListener('visibilitychange', onVisibility); window.addEventListener('blur', onBlur);
-  setup(); raf = requestAnimationFrame(frame);
+  setup();
+  if(session.mode==='match'&&session.participation&&!session.participation.entered){
+    overview=true;host.querySelector('.field-stage')!.setAttribute('data-view','bench');view3d?.setBenchView(true);view3d?.setOnBench(true);
+    $('match-entry').hidden=false;$('match-entry-title').textContent=`Você vai entrar aos ${session.participation.entryMinute}′`;
+    draw();
+  }
+  $('match-enter').onclick=()=>{
+    if(!session.participation||session.participation.entered)return;
+    const entered={...session,participation:{...session.participation,entered:true}};
+    try{options.onProgress(entered);session=entered;overview=false;view3d?.setBenchView(false);view3d?.setOnBench(false);$('match-entry').hidden=true;host.querySelector('.field-stage')!.setAttribute('data-view','player');last=0;draw();}
+    catch{ $('match-entry-title').textContent='Não foi possível salvar sua entrada. Tente novamente.'; }
+  };
+  raf = requestAnimationFrame(frame);
   return () => { disposed = true; window.removeEventListener('keydown', onReviewKey, true); cancelAnimationFrame(raf); document.removeEventListener('visibilitychange', onVisibility); window.removeEventListener('blur', onBlur); pauseMenu.close(); document.body.classList.remove('field-screen'); void audio?.close(); view3d?.dispose(); };
 }

@@ -6,11 +6,13 @@ import { ATTRIBUTES, POSITIONS, type CareerState, type Performance } from '../do
 import { calculateOverall, type Attributes, type Position } from '../domain/player/player.js';
 import { developmentClubs, type ClubDataProvider } from '../data/clubs.js';
 import { assess, recruit } from '../domain/youth/youth.js';
+import { initialYouthClub } from '../domain/youth/placement.js';
+import { plannedMinutes } from '../domain/match/participation.js';
 import { train, type Focus } from '../domain/training/training.js';
 import { makeOffer, sign } from '../domain/transfers/contracts.js';
 import { eligible, record } from '../domain/career/progression.js';
 export interface NewCareer { name: string; nationality: string; position: Position; preferredFoot: 'left' | 'right' | 'both'; seed: number; startingAge?: 14 | 15 | 16; startingClubId?: string; shirtNumber?: number; dataPack?: FootballPack }
-export type Command = { type: 'practice'; focus: Focus; quality: number } | { type: 'assess'; performances: Attributes } | { type: 'train'; focus: Focus } | { type: 'accept'; offerId: string }
+export type Command = { type: 'place-youth'; quality: number } | { type: 'practice'; focus: Focus; quality: number } | { type: 'assess'; performances: Attributes } | { type: 'train'; focus: Focus } | { type: 'accept'; offerId: string }
   | { type: 'shirt-number'; number: number } | { type: 'kit'; index: number } | { type: 'performance'; performance: Performance } | { type: 'recover' | 'scout' | 'prepare' | 'promote' | 'advance-week' | 'renew' };
 export function createCareer(input: NewCareer, provider: ClubDataProvider = developmentClubs): CareerState {
   for (const value of [input.name, input.nationality]) requireRule(typeof value === 'string' && value.trim().length > 0 && value.length <= 100, 'Nome/nacionalidade inválidos.');
@@ -42,6 +44,15 @@ function allowed(state: CareerState, stages: CareerState['stage'][]) { requireRu
 export function advanceCareer(previous: CareerState, command: Command): CareerState {
   const s = structuredClone(previous);
   switch (command.type) {
+    case 'place-youth': {
+      allowed(s,['assessed','trained']);requireRule(!s.contract,'O jogador já pertence a um clube.');
+      const club=initialYouthClub(s.player,s.clubs,command.quality);
+      if(!club){s.history.push('Nenhuma base com vaga, orçamento e perfil compatível. Continue treinando para uma nova avaliação.');break;}
+      const offer=makeOffer(s.player,club,'youth')!,result=sign(s.player,club,offer,s.date);
+      s.contract=result.contract;s.clubs=s.clubs.map(c=>c.id===club.id?result.club:c);s.stage=s.trainingSessions>0?'contracted':'assessed';s.offers=[];
+      s.coachTrust=Math.round(35+command.quality*.15);joinShirt(s,true);
+      s.history.push(`Avaliação ${Math.round(command.quality)}/100: recrutado automaticamente pela base do ${club.name}.`);break;
+    }
     case 'shirt-number': chooseNumber(s, command.number); s.history.push(`Camisa ${command.number} escolhida.`); break;
     case 'kit': requireRule(Number.isInteger(command.index) && command.index >= 0 && command.index <= 2, 'Uniforme inválido.'); s.shirt.kitIndex = command.index; break;
     case 'assess': { allowed(s, ['created']); const r = assess(s.player, command.performances, s.rng); Object.assign(s, r); s.stage = 'assessed'; s.history.push('Avaliação de fundamentos concluída.'); break; }
@@ -85,7 +96,7 @@ export function advanceCareer(previous: CareerState, command: Command): CareerSt
       const fixture = nextFixture(s);
       const date = fixture?.date ?? addDays(s.date, 7); requireRule(date < s.contract.endDate, 'Contrato não cobre a partida.');
       s.preparation = { fixtureId: fixture?.id ?? null, competition: fixture ? s.world.tournaments.find(t => t.id === fixture.competitionId)!.name : s.contract.team === 'youth' ? 'Amistoso de integração da base' : 'Amistoso de integração do principal', opponent: fixture ? s.world.teams.find(t => t.id === (fixture.home === s.contract!.clubId || fixture.home === `nation:${s.player.nationality}` ? fixture.away : fixture.home))!.name : 'Equipe de avaliação local', date,
-        role: s.contract.role, expectedMinutes: s.contract.role === 'reserve' ? 30 : 15, coachTrust: s.coachTrust,
+        role: s.contract.role, expectedMinutes: plannedMinutes(s.contract.role,s.coachTrust,s.player.energy,s.development.recentRatings), coachTrust: s.coachTrust,
         objective: `Cumpra as ações da posição ${s.player.position}. Minutos previstos não são garantia.` };
       s.stage = 'ready'; s.offers = []; s.history.push('Preparação para a próxima partida concluída.'); break;
     }
@@ -99,7 +110,7 @@ export function advanceCareer(previous: CareerState, command: Command): CareerSt
       s.player.energy = Math.max(0, s.player.energy - Math.ceil(command.performance.minutes / 3));
       s.player.morale = Math.max(1, Math.min(100, s.player.morale + Math.round(command.performance.rating - 6)));
       s.player.reputation = Math.min(100, s.player.reputation + (command.performance.rating >= 7 ? 1 : 0));
-      s.history.push(`Atuação registrada: nota ${command.performance.rating}.`); break;
+      s.history.push(`Atuação registrada: nota ${command.performance.rating} · ${command.performance.minutes} minutos · ${command.performance.goals} gols.`); break;
     }
     case 'promote': {
       allowed(s, ['contracted', 'active']); requireRule(s.contract?.team === 'youth', 'Jogador deve estar na base.');

@@ -21,3 +21,23 @@ test('a direct fast pass to the visible teammate can be controlled in all three 
   const {teammateAt}=await import('./trial.js');
   for(const seed of [0,1,2]){const t=createTrial('pass',1,seed);controlTrial(t,{type:'kick',aim:teammateAt(0,t.layout),curve:0,lift:0,velocity:115});for(let i=0;i<50&&!t.resolved;i++)tickTrial(t,.025);assert.equal(t.outcome,'received');}
 });
+
+test('a teammate on the actual route controls before a farther intended recipient; offside uses the involved player',()=>{
+  const t=createTrial('vision',1,42);
+  t.mates=[{x:440,y:550},{x:440,y:150}];t.defenders=[{x:20,y:250},{x:860,y:250}];
+  controlTrial(t,{type:'kick',aim:{x:440,y:150},curve:0,lift:0});
+  assert.equal(t.shot!.support!.index,1);assert.equal(t.shot!.offside,true);
+  for(let i=0;i<60&&!t.resolved;i++)tickTrial(t,.025);
+  assert.equal(t.outcome,'received');assert.equal(t.shot!.support!.index,0);assert.equal(t.shot!.offside,false);
+  assert.equal(t.shot!.support!.controlled,true);
+  assert.ok(t.shot!.elapsed<t.shot!.duration*.8);
+});
+
+test('running back toward a pass never erases an offside position recorded at kick time',()=>{
+  const t=createTrial('vision',1,42);t.mates=[{x:440,y:150}];t.defenders=[{x:20,y:250},{x:860,y:250}];
+  controlTrial(t,{type:'kick',aim:{x:440,y:300},curve:0,lift:0});
+  const frozen=structuredClone(t.shot!.offsideSnapshot);t.defenders.forEach(p=>p.y=100);
+  for(let i=0;i<60&&!t.resolved;i++)tickTrial(t,.025);
+  assert.equal(t.outcome,'offside');assert.deepEqual(t.shot!.offsideSnapshot,frozen);
+  assert.ok(t.shot!.support!.position.y>250);
+});

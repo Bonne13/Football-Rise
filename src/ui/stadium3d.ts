@@ -166,12 +166,7 @@ export function buildStadium(scene: T.Scene, profile: StadiumProfile, colors: { 
     const pole = new THREE.Mesh(new THREE.CylinderGeometry(.11, .18, height, 8), pale); pole.position.set(x, height / 2, z); scene.add(pole);
     const lamps = new THREE.Mesh(new THREE.BoxGeometry(profile.size === 'arena' ? 4 : 2.2, .9, .3), new THREE.MeshStandardMaterial({ color: '#f4ffff', emissive: '#bfd6df', emissiveIntensity: .7 })); lamps.position.set(x, height - .5, z); scene.add(lamps);
   }
-  // Dugouts, technical areas, scoreboards and access buildings make the ground feel inhabited.
-  for (const z of [39, 66]) {
-    const shelter = box(scene, [2.8, 2, 9], [-37.5, 1, z], panel);
-    box(scene, [3.1, .16, 9.4], [-37.5, 2.1, z], pale);
-    for (let i = 0; i < 7; i++) box(scene, [.55, .7, .5], [-37.8, .55, z - 3 + i], clubTrim);
-  }
+  // Open dugouts with seated players are supplied by benches3d, rather than solid placeholder boxes.
   const screenCanvas = document.createElement('canvas'); screenCanvas.width = 512; screenCanvas.height = 192;
   const screenContext = screenCanvas.getContext('2d')!;
   screenContext.fillStyle = '#091722'; screenContext.fillRect(0, 0, 512, 192);
